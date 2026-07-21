@@ -170,7 +170,7 @@ export default function LaporanBulanan({
   const availableWeeks = getAvailableWeeks(selectedBulan, selectedTahun);
   const canExportBulanan = laporanBulanan.length > 0;
 
-  const visibleLaporan = laporanBulanan.filter(r => r.status_dokumen !== "Draft");
+  const visibleLaporan = laporanBulanan;
 
   return (
     <>

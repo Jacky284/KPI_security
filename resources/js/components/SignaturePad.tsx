@@ -36,7 +36,7 @@ export function SignaturePad({ onConfirm, label }: SignaturePadProps) {
       <div className="flex flex-col gap-2 border p-3 rounded-lg bg-card shadow-sm">
         <span className="text-sm font-semibold text-foreground">{label}</span>
         <div 
-          className="border bg-white rounded-md overflow-hidden cursor-crosshair"
+          className="border bg-white rounded-md overflow-hidden cursor-crosshair flex justify-center"
           onMouseUp={handleEnd}
           onMouseOut={handleEnd}
           onTouchEnd={handleEnd}
@@ -47,7 +47,7 @@ export function SignaturePad({ onConfirm, label }: SignaturePadProps) {
             canvasProps={{
               width: 300,
               height: 120,
-              className: 'sigCanvas w-full h-[120px]'
+              className: 'sigCanvas touch-none'
             }}
             onEnd={handleEnd}
           />

@@ -88,19 +88,52 @@ class PelanggaranController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        $query = CatatanPelanggaran::with(['anggota:id_user,nama_lengkap,regu', 'danruPenilai:id_user,nama_lengkap']);
+
+        $now = \Carbon\Carbon::now();
+        $defaultBulanMap = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+        ];
+        $defaultBulan = $defaultBulanMap[$now->month];
+        $defaultTahun = $now->year;
+        
+        $firstDayOfMonth = $now->copy()->startOfMonth();
+        $offset = $firstDayOfMonth->dayOfWeekIso - 1;
+        $defaultMingguKe = (int) ceil(($now->day + $offset) / 7);
+
+        $bulan = $request->input('bulan', $defaultBulan);
+        $tahun = (int)$request->input('tahun', $defaultTahun);
+        $minggu_ke = (int)$request->input('minggu_ke', $defaultMingguKe);
+        $filter_regu = $request->input('filter_regu');
+
+        $query = CatatanPelanggaran::with(['anggota:id_user,nama_lengkap,regu', 'danruPenilai:id_user,nama_lengkap'])
+            ->where('bulan', $bulan)
+            ->where('tahun', $tahun)
+            ->where('minggu_ke', $minggu_ke);
 
         if (strtolower(trim($user->role)) === 'danru') {
             $query->whereHas('anggota', function ($q) use ($user) {
                 $q->where('regu', trim($user->regu));
             });
+        } else if ((strtolower(trim($user->role)) === 'chief' || strtolower(trim($user->role)) === 'admin') && $filter_regu) {
+            $query->whereHas('anggota', function ($q) use ($filter_regu) {
+                $q->where('regu', $filter_regu);
+            });
         }
 
         $pelanggaran = $query->orderBy('tanggal_kejadian', 'desc')->get();
 
+        $reguList = User::where('role', 'Danru')->where('status_aktif', 1)->pluck('regu')->filter()->unique()->values();
+
         return Inertia::render('Pelanggaran/DaftarPelanggaran', [
             'pelanggaran' => $pelanggaran,
             'userRole' => $user->role,
+            'selectedBulan' => $bulan,
+            'selectedTahun' => $tahun,
+            'selectedMinggu' => $minggu_ke,
+            'filterRegu' => $filter_regu,
+            'reguList' => $reguList,
         ]);
     }
 

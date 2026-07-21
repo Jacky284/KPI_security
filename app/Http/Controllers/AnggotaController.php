@@ -177,11 +177,67 @@ class AnggotaController extends Controller
             ];
         }
 
+        // 4. Calculate Indicator Breakdown (Last 3 Months Aggregated)
+        $indicatorScores = [];
+        // Default Indicators
+        $defaultIndicators = ['Kedisiplinan', 'Kerapihan', 'Komunikasi', 'Pelayanan', 'Integritas'];
+        foreach ($defaultIndicators as $ind) {
+            $indicatorScores[$ind] = ['name' => $ind, 'Siang' => 100, 'Malam' => 100];
+        }
+
+        // Fetch all violations for the last 3 months
+        $startOf3Months = $now->copy()->subMonths(2)->startOfMonth();
+        $violations3Months = CatatanPelanggaran::where('id_anggota', $id)
+            ->whereDate('tanggal_kejadian', '>=', $startOf3Months)
+            ->get();
+            
+        $jadwal3Months = JadwalBulanan::where('id_anggota', $id)
+            ->where(function($q) use ($startOf3Months, $now) {
+                // simple approximation, just fetch all in current year and previous year
+                $q->whereIn('tahun', [$startOf3Months->year, $now->year]);
+            })
+            ->get()->keyBy(function($j) { return $j->tahun . '-' . str_pad($j->bulan, 2, '0', STR_PAD_LEFT); });
+
+        foreach ($violations3Months as $v) {
+            $deduction = 5;
+            if ($v->tingkat_pelanggaran === 'Sedang') $deduction = 10;
+            if ($v->tingkat_pelanggaran === 'Berat') $deduction = 25;
+
+            $kategori = $v->kategori_indikator ?: 'Lainnya';
+            if (!isset($indicatorScores[$kategori])) {
+                $indicatorScores[$kategori] = ['name' => $kategori, 'Siang' => 100, 'Malam' => 100];
+            }
+
+            $vDate = Carbon::parse($v->tanggal_kejadian);
+            $jKey = $vDate->year . '-' . str_pad($vDate->month, 2, '0', STR_PAD_LEFT);
+            $jadwalThatMonth = $jadwal3Months->get($jKey);
+
+            $shift = 'Siang';
+            if ($jadwalThatMonth && $jadwalThatMonth->jadwal_harian) {
+                $day = $vDate->format('j');
+                $dailyShift = $jadwalThatMonth->jadwal_harian[$day] ?? 'Libur';
+                if (strpos(strtolower($dailyShift), 'malam') !== false) {
+                    $shift = 'Malam';
+                } else if (strpos(strtolower($dailyShift), 'pagi') !== false || strpos(strtolower($dailyShift), 'siang') !== false) {
+                    $shift = 'Siang';
+                }
+            }
+
+            if ($shift === 'Malam') {
+                $indicatorScores[$kategori]['Malam'] = max(0, $indicatorScores[$kategori]['Malam'] - $deduction);
+            } else {
+                $indicatorScores[$kategori]['Siang'] = max(0, $indicatorScores[$kategori]['Siang'] - $deduction);
+            }
+        }
+
+        $indicatorTrendData = array_values($indicatorScores);
+
         return Inertia::render('Anggota/Detail', [
             'anggota' => $anggota,
             'riwayatPelanggaran' => $riwayatPelanggaran,
             'jadwalBulanIni' => $jadwalBulanIni,
             'trendData' => $trendData,
+            'indicatorTrendData' => $indicatorTrendData,
         ]);
     }
 }

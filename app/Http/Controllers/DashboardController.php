@@ -153,6 +153,76 @@ class DashboardController extends Controller
                 }
             }
 
+            // --- Calculate 3-Month Trend (Siang & Malam) for the Regu ---
+            $now = \Carbon\Carbon::now();
+            $defaultBulanMap = [
+                1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+                5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+                9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+            ];
+
+            $trendSiang = [];
+            $trendMalam = [];
+
+            $anggotaNames = $anggota->pluck('nama_lengkap', 'id_user')->toArray();
+
+            if (!empty($anggotaIds)) {
+                for ($i = 2; $i >= 0; $i--) {
+                    $targetDate = $now->copy()->subMonths($i);
+                    $tMonth = $targetDate->month;
+                    $tYear = $targetDate->year;
+                    $tBulanStr = $defaultBulanMap[$tMonth];
+                    $shortBulan = substr($tBulanStr, 0, 3);
+                    
+                    $monthDataSiang = ['name' => $shortBulan];
+                    $monthDataMalam = ['name' => $shortBulan];
+                    
+                    // Initialize 100 for everyone
+                    foreach ($anggotaNames as $id => $name) {
+                        $monthDataSiang[$name] = 100;
+                        $monthDataMalam[$name] = 100;
+                    }
+
+                    $violationsThisMonth = \App\Models\CatatanPelanggaran::whereIn('id_anggota', $anggotaIds)
+                        ->where('bulan', $tBulanStr)
+                        ->where('tahun', $tYear)
+                        ->get();
+                        
+                    $jadwalsThatMonth = \App\Models\JadwalBulanan::whereIn('id_anggota', $anggotaIds)
+                        ->where('bulan', str_pad($tMonth, 2, '0', STR_PAD_LEFT))
+                        ->where('tahun', $tYear)
+                        ->get()->keyBy('id_anggota');
+
+                    foreach ($violationsThisMonth as $v) {
+                        $deduction = 5;
+                        if ($v->tingkat_pelanggaran === 'Sedang') $deduction = 10;
+                        if ($v->tingkat_pelanggaran === 'Berat') $deduction = 25;
+                        
+                        $shift = 'Siang';
+                        if (isset($jadwalsThatMonth[$v->id_anggota])) {
+                            $jadwal = $jadwalsThatMonth[$v->id_anggota];
+                            $day = \Carbon\Carbon::parse($v->tanggal_kejadian)->format('j');
+                            $dailyShift = $jadwal->jadwal_harian[$day] ?? 'Libur';
+                            if (strpos(strtolower($dailyShift), 'malam') !== false) {
+                                $shift = 'Malam';
+                            } else if (strpos(strtolower($dailyShift), 'pagi') !== false || strpos(strtolower($dailyShift), 'siang') !== false) {
+                                $shift = 'Siang';
+                            }
+                        }
+                        
+                        $name = $anggotaNames[$v->id_anggota];
+                        if ($shift === 'Malam') {
+                            $monthDataMalam[$name] = max(0, $monthDataMalam[$name] - $deduction);
+                        } else {
+                            $monthDataSiang[$name] = max(0, $monthDataSiang[$name] - $deduction);
+                        }
+                    }
+                    
+                    $trendSiang[] = $monthDataSiang;
+                    $trendMalam[] = $monthDataMalam;
+                }
+            }
+
             return Inertia::render('Dashboard/Index', [
                 'anggota' => $anggota,
                 'currentUser' => [
@@ -163,6 +233,8 @@ class DashboardController extends Controller
                 'weekDates' => $weekDates,
                 'jadwalMingguan' => $jadwalData,
                 'currentStartDate' => $startOfWeek->format('Y-m-d'),
+                'trendSiang' => $trendSiang,
+                'trendMalam' => $trendMalam,
             ]);
         }
     }

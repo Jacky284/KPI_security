@@ -94,18 +94,18 @@ export const sidebarItems: NavGroup[] = [
         url: "/pelanggaran",
         icon: ListTodo,
       },
-      {
-        id: "daftar-pelanggaran",
-        title: "Daftar Pelanggaran",
-        url: "/pelanggaran/daftar",
-        icon: CheckSquare,
-      },
     ],
   },
   {
     id: 3,
     label: "Laporan & Evaluasi",
     items: [
+      {
+        id: "daftar-pelanggaran",
+        title: "Daftar Pelanggaran",
+        url: "/pelanggaran/daftar",
+        icon: CheckSquare,
+      },
       {
         id: "laporan-mingguan",
         title: "Laporan Mingguan",

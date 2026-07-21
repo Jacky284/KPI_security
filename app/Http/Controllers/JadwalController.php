@@ -126,7 +126,7 @@ class JadwalController extends Controller
         } else if ($type === 'pdf') {
             $export = new \App\Exports\JadwalBulananExport($bulan, $tahun);
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.jadwal_bulanan', $export->view()->getData())
-                ->setPaper('a3', 'landscape');
+                ->setPaper('a4', 'landscape');
             return $pdf->stream("jadwal_bulanan_{$bulan}_{$tahun}.pdf");
         }
 

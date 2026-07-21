@@ -31,9 +31,14 @@ interface Pelanggaran {
 interface Props {
   pelanggaran: Pelanggaran[];
   userRole: string;
+  selectedBulan: string;
+  selectedTahun: number;
+  selectedMinggu: number;
+  filterRegu?: string | null;
+  reguList?: string[];
 }
 
-export default function DaftarPelanggaran({ pelanggaran, userRole }: Props) {
+export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan, selectedTahun, selectedMinggu, filterRegu, reguList }: Props) {
   const [processingId, setProcessingId] = useState<number | null>(null);
 
   const handleTindakLanjut = (id: number) => {
@@ -59,6 +64,35 @@ export default function DaftarPelanggaran({ pelanggaran, userRole }: Props) {
     }
   };
 
+  const listBulan = [
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+  ];
+
+  const getAvailableWeeks = (bulanStr: string, tahun: number) => {
+    const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    const monthIndex = months.indexOf(bulanStr);
+    if (monthIndex === -1) return [1, 2, 3, 4, 5];
+    const firstDay = new Date(tahun, monthIndex, 1);
+    const lastDay = new Date(tahun, monthIndex + 1, 0);
+    const numDays = lastDay.getDate();
+    const firstDayOfWeek = (firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1);
+    const totalWeeks = Math.ceil((numDays + firstDayOfWeek) / 7);
+    return Array.from({ length: totalWeeks }, (_, i) => i + 1);
+  };
+
+  const availableWeeks = getAvailableWeeks(selectedBulan, selectedTahun);
+
+  const handleFilterChange = (bulan: string, minggu: number, tahun: number, regu?: string | null) => {
+    const available = getAvailableWeeks(bulan, tahun);
+    if (!available.includes(minggu)) {
+      minggu = available[available.length - 1]; // Clamp to the last available week if out of bounds
+    }
+    const params: any = { bulan, minggu_ke: minggu, tahun };
+    if (regu) params.filter_regu = regu;
+    router.get("/pelanggaran", params);
+  };
+
   return (
     <>
       <Head title="Daftar Pelanggaran" />
@@ -67,6 +101,56 @@ export default function DaftarPelanggaran({ pelanggaran, userRole }: Props) {
           <h1 className="text-2xl font-bold text-primary tracking-tight">Daftar Catatan Pelanggaran</h1>
           <p className="text-sm text-muted-foreground">Riwayat pelanggaran kinerja personel sekuriti. Chief Security wajib menindaklanjuti setiap laporan.</p>
         </div>
+
+        {/* Filters */}
+        <div className="flex flex-col md:flex-row md:flex-wrap gap-4 md:items-center bg-card border p-4 rounded-lg shadow-2xs">
+          <div className="grid grid-cols-2 md:flex md:flex-row gap-4 items-center w-full md:w-auto">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Bulan</label>
+              <select
+                value={selectedBulan}
+                onChange={(e) => handleFilterChange(e.target.value, selectedMinggu, selectedTahun, filterRegu)}
+                className="p-2 text-sm border rounded-md bg-background focus:ring-2 focus:ring-primary/50 w-full"
+              >
+                {listBulan.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Minggu Ke</label>
+              <select
+                value={selectedMinggu}
+                onChange={(e) => handleFilterChange(selectedBulan, parseInt(e.target.value), selectedTahun, filterRegu)}
+                className="p-2 border rounded-md text-sm bg-background w-full"
+              >
+                {availableWeeks.map(w => <option key={w} value={w}>Minggu {w}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Tahun</label>
+              <input
+                type="number"
+                value={selectedTahun}
+                onChange={(e) => handleFilterChange(selectedBulan, selectedMinggu, parseInt(e.target.value), filterRegu)}
+                className="p-2 w-full md:w-24 text-sm border rounded-md bg-background focus:ring-2 focus:ring-primary/50"
+              />
+            </div>
+
+            {(userRole === "Chief" || userRole === "Admin") && reguList && reguList.length > 0 && (
+              <div className="flex flex-col gap-1 md:border-l md:pl-4 w-full md:w-auto">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Filter Regu</label>
+                <select
+                  value={filterRegu || ""}
+                  onChange={(e) => handleFilterChange(selectedBulan, selectedMinggu, selectedTahun, e.target.value)}
+                  className="p-2 text-sm border rounded-md bg-background focus:ring-2 focus:ring-primary/50 w-full"
+                >
+                  <option value="">Semua Regu</option>
+                  {reguList.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+            )}
+          </div>
+        </div>
+
         <Card>
           <CardContent className="pt-6">
             {/* Desktop View */}

@@ -424,7 +424,6 @@ class LaporanController extends Controller
         $this->autoGenerateLaporan($bulan, $tahun);
 
         $laporanQuery = LaporanBulanan::with('danruPembuat')
-            ->where('bulan', $bulan)
             ->where('tahun', $tahun);
         if (strtolower(trim($user->role)) === 'danru') {
             $laporanQuery->where('regu', trim($user->regu));
@@ -432,6 +431,9 @@ class LaporanController extends Controller
             $laporanQuery->where('regu', $filter_regu);
         }
         $laporanBulanan = $this->attachSignableStatus($laporanQuery->get(), 'bulanan');
+        $laporanBulanan = collect($laporanBulanan)->sortBy(function ($item) {
+            return $this->parseBulanToNumber($item->bulan);
+        })->values();
 
         $detailedMonthlyData = $this->getDetailedMonthlyData($bulan, $tahun, $filter_regu);
 
@@ -613,7 +615,7 @@ class LaporanController extends Controller
         } else if ($type === 'pdf') {
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.laporan_bulanan', [
                 'detailedMonthlyData' => $detailedMonthlyData,
-                'laporanBulanan' => $laporanBulanan,
+                'laporanBulananObj' => $laporanBulanan,
                 'bulan' => $bulan,
                 'tahun' => $tahun,
             ])->setPaper('a4', 'landscape');

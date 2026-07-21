@@ -3,8 +3,9 @@ import { Link, Head, router } from "@inertiajs/react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, AlertTriangle, ChevronLeft, ChevronRight, Calendar as CalendarIcon, CheckCircle2, XCircle, Minus } from "lucide-react";
+import { Users, AlertTriangle, ChevronLeft, ChevronRight, Calendar as CalendarIcon, CheckCircle2, XCircle, Minus, Activity } from "lucide-react";
 import { getStatusBadge } from "@/lib/utils";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from "recharts";
 
 interface Anggota {
   id_user: number;
@@ -34,6 +35,11 @@ interface WeekDate {
   year: string;
 }
 
+interface TrendData {
+  name: string;
+  [key: string]: string | number;
+}
+
 interface Props {
   anggota?: Anggota[];
   danrus?: DanruDashboardData[];
@@ -43,9 +49,11 @@ interface Props {
   currentStartDate?: string;
   currentBulan?: string;
   currentTahun?: number;
+  trendSiang?: TrendData[];
+  trendMalam?: TrendData[];
 }
 
-export default function Page({ anggota, danrus, currentUser, weekDates, jadwalMingguan, currentStartDate, currentBulan, currentTahun }: Props) {
+export default function Page({ anggota, danrus, currentUser, weekDates, jadwalMingguan, currentStartDate, currentBulan, currentTahun, trendSiang, trendMalam }: Props) {
   const isChiefOrAdmin = currentUser.role === "Chief" || currentUser.role === "Admin";
   
   const navigateWeek = (direction: 'prev' | 'next') => {
@@ -365,6 +373,79 @@ export default function Page({ anggota, danrus, currentUser, weekDates, jadwalMi
                 </Card>
               ))}
             </div>
+
+            {/* Performance Charts (Siang vs Malam) */}
+            {trendSiang && trendMalam && anggota && anggota.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                <Card className="shadow-xs border-2">
+                  <CardHeader className="bg-muted/30 border-b pb-4">
+                    <CardTitle className="text-md font-bold flex items-center gap-2">
+                      <Activity className="size-5 text-primary" />
+                      Tren Kinerja: Shift Siang (3 Bulan)
+                    </CardTitle>
+                    <CardDescription>Skor kedisiplinan & performa anggota regu selama bertugas siang hari.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-6">
+                    <div className="h-[300px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={trendSiang} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                          <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
+                          <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12 }} domain={[0, 100]} />
+                          <RechartsTooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                          <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                          {anggota.map((person, idx) => (
+                            <Line
+                              key={person.id_user}
+                              type="monotone"
+                              dataKey={person.nama_lengkap}
+                              stroke={`hsl(${(idx * 137.5) % 360}, 70%, 50%)`}
+                              strokeWidth={2}
+                              dot={{ r: 4, strokeWidth: 2 }}
+                              activeDot={{ r: 6 }}
+                            />
+                          ))}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-xs border-2">
+                  <CardHeader className="bg-muted/30 border-b pb-4">
+                    <CardTitle className="text-md font-bold flex items-center gap-2">
+                      <Activity className="size-5 text-indigo-600" />
+                      Tren Kinerja: Shift Malam (3 Bulan)
+                    </CardTitle>
+                    <CardDescription>Skor kedisiplinan & performa anggota regu selama bertugas malam hari.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-6">
+                    <div className="h-[300px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={trendMalam} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                          <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
+                          <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12 }} domain={[0, 100]} />
+                          <RechartsTooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                          <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                          {anggota.map((person, idx) => (
+                            <Line
+                              key={person.id_user}
+                              type="monotone"
+                              dataKey={person.nama_lengkap}
+                              stroke={`hsl(${(idx * 137.5 + 180) % 360}, 70%, 50%)`}
+                              strokeWidth={2}
+                              dot={{ r: 4, strokeWidth: 2 }}
+                              activeDot={{ r: 6 }}
+                            />
+                          ))}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </>
         )}
       </div>

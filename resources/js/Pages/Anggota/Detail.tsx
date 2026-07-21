@@ -4,7 +4,7 @@ import DashboardLayout from "@/Layouts/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from "recharts";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from "recharts";
 import { MapPin, Calendar, Clock, Briefcase, FileWarning, ArrowLeft, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -43,9 +43,10 @@ interface Props {
   riwayatPelanggaran: CatatanPelanggaran[];
   jadwalBulanIni: JadwalBulanan | null;
   trendData: TrendData[];
+  indicatorTrendData?: TrendData[];
 }
 
-export default function Detail({ anggota, riwayatPelanggaran, jadwalBulanIni, trendData }: Props) {
+export default function Detail({ anggota, riwayatPelanggaran, jadwalBulanIni, trendData, indicatorTrendData }: Props) {
   
   // Format Tanggal Lahir
   const formatDate = (dateStr: string | null) => {
@@ -162,13 +163,41 @@ export default function Detail({ anggota, riwayatPelanggaran, jadwalBulanIni, tr
                         stroke="#6366f1" // Indigo/Blue for Night
                         strokeWidth={3}
                         dot={{ r: 4, strokeWidth: 2 }}
-                        activeDot={{ r: 6 }}
+                        activeDot={{ r: 8 }} 
                       />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>
             </Card>
+
+            {/* Indicator Breakdown Chart */}
+            {indicatorTrendData && (
+              <Card className="shadow-sm">
+                <CardHeader>
+                  <CardTitle>Rincian Skor per Indikator (3 Bulan Terakhir)</CardTitle>
+                  <CardDescription>Analisis indikator mana yang paling sering dilanggar pada masing-masing shift.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={indicatorTrendData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                        <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={10} tick={{ fontSize: 12 }} />
+                        <YAxis domain={[0, 100]} tickLine={false} axisLine={false} tickMargin={10} tick={{ fontSize: 12 }} />
+                        <RechartsTooltip 
+                          cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                          contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                        />
+                        <Legend verticalAlign="top" height={36}/>
+                        <Bar dataKey="Siang" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="Malam" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Violation History */}
             <Card className="shadow-sm">
