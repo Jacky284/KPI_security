@@ -1,18 +1,13 @@
 import type { ReactNode } from "react";
 import { Link } from "@inertiajs/react";
-import { siGithub } from "simple-icons";
 import { AppSidebar } from "@/components/dashboard/sidebar/app-sidebar";
-import { SimpleIcon } from "@/components/simple-icon";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { users } from "@/data/users";
 import { cn } from "@/lib/utils";
 import { getClientCookie } from "@/lib/cookie.client";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 import { useShallow } from "zustand/react/shallow";
-
-import { AccountSwitcher } from "@/components/dashboard/sidebar/account-switcher";
 import { LayoutControls } from "@/components/dashboard/sidebar/layout-controls";
 import { SearchDialog } from "@/components/dashboard/sidebar/search-dialog";
 import { ThemeSwitcher } from "@/components/dashboard/sidebar/theme-switcher";
@@ -49,7 +44,7 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
         <header
           className={cn(
             "flex h-12 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12",
-            "[html[data-navbar-style=sticky]_&]:sticky [html[data-navbar-style=sticky]_&]:top-0 [html[data-navbar-style=sticky]_&]:z-50 [html[data-navbar-style=sticky]_&]:overflow-hidden [html[data-navbar-style=sticky]_&]:rounded-t-[inherit] [html[data-navbar-style=sticky]_&]:bg-background/50 [html[data-navbar-style=sticky]_&]:backdrop-blur-md",
+            "sticky top-0 z-50 overflow-hidden rounded-t-[inherit] bg-background/50 backdrop-blur-md",
           )}
         >
           <div className="flex w-full items-center justify-between px-4 lg:px-6">
@@ -64,7 +59,6 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
             <div className="flex items-center gap-2">
               <LayoutControls />
               <ThemeSwitcher />
-              <AccountSwitcher users={users} />
             </div>
           </div>
         </header>

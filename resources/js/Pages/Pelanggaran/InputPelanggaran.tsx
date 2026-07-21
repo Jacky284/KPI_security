@@ -10,24 +10,85 @@ interface Anggota {
   regu: string;
 }
 
-interface Props {
-  anggota: Anggota[];
+interface JadwalBulanan {
+  id_jadwal: number;
+  id_anggota: number;
+  bulan: string;
+  tahun: number;
+  jadwal_harian: Record<string, string>;
 }
 
-export default function InputPelanggaran({ anggota }: Props) {
+interface Props {
+  anggota: Anggota[];
+  jadwals: JadwalBulanan[];
+}
+
+export default function InputPelanggaran({ anggota, jadwals }: Props) {
   const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const initialAnggotaId = urlParams ? urlParams.get("id_anggota") || "" : "";
 
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const day = today.getDate();
+  const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+  const bulanStr = months[month];
+  
+  const firstDay = new Date(year, month, 1);
+  const firstDayOfWeek = (firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1);
+  const mingguKe = Math.ceil((day + firstDayOfWeek) / 7);
+
   const { data, setData, post, processing, errors, reset, wasSuccessful } = useForm({
     id_anggota: initialAnggotaId,
-    tanggal_kejadian: new Date().toISOString().split("T")[0],
-    minggu_ke: 1,
-    bulan: "Juli",
-    tahun: new Date().getFullYear(),
+    tanggal_kejadian: today.toISOString().split("T")[0],
+    minggu_ke: mingguKe,
+    bulan: bulanStr,
+    tahun: year,
     kategori_indikator: "Kedisiplinan",
     tingkat_pelanggaran: "Ringan",
     deskripsi_kejadian: "",
   });
+
+  const getAvailableWeeks = (bulanStr: string, tahun: number) => {
+    const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    const monthIndex = months.indexOf(bulanStr);
+    if (monthIndex === -1) return [1, 2, 3, 4, 5];
+    const firstDay = new Date(tahun, monthIndex, 1);
+    const lastDay = new Date(tahun, monthIndex + 1, 0);
+    const numDays = lastDay.getDate();
+    const firstDayOfWeek = (firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1);
+    const totalWeeks = Math.ceil((numDays + firstDayOfWeek) / 7);
+    return Array.from({ length: totalWeeks }, (_, i) => i + 1);
+  };
+
+  const availableWeeks = getAvailableWeeks(data.bulan, data.tahun);
+
+  const handleDateChange = (dateStr: string) => {
+    if (!dateStr) {
+      setData("tanggal_kejadian", dateStr);
+      return;
+    }
+    
+    const [y, m, d] = dateStr.split('-');
+    const year = parseInt(y);
+    const month = parseInt(m) - 1;
+    const day = parseInt(d);
+
+    const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    const bulanStr = months[month];
+    
+    const firstDay = new Date(year, month, 1);
+    const firstDayOfWeek = (firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1);
+    const mingguKe = Math.ceil((day + firstDayOfWeek) / 7);
+
+    setData({
+      ...data,
+      tanggal_kejadian: dateStr,
+      tahun: year,
+      bulan: bulanStr,
+      minggu_ke: mingguKe
+    });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,22 +105,45 @@ export default function InputPelanggaran({ anggota }: Props) {
     "Juli", "Agustus", "September", "Oktober", "November", "Desember"
   ];
 
+  // Calculate selected Regu
+  const selectedUser = anggota.find(a => a.id_user.toString() === data.id_anggota.toString());
+  const reguName = selectedUser?.regu || "-";
+
+  // Calculate Shift based on selected user and date
+  let shiftName = "-";
+  if (data.id_anggota && data.tanggal_kejadian) {
+    const dateObj = new Date(data.tanggal_kejadian);
+    const day = dateObj.getDate().toString();
+    const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+    const year = dateObj.getFullYear();
+
+    const userJadwal = jadwals.find(j =>
+      j.id_anggota.toString() === data.id_anggota.toString() &&
+      j.bulan === month &&
+      j.tahun === year
+    );
+
+    if (userJadwal && userJadwal.jadwal_harian) {
+      shiftName = userJadwal.jadwal_harian[day] || "Libur";
+    } else {
+      shiftName = "Tidak Ada Jadwal (Libur)";
+    }
+  }
+
   return (
     <>
       <Head title="Input Pelanggaran" />
-      <div className="max-w-2xl mx-auto py-6">
+      <div className="flex flex-col gap-6 max-w-2xl mx-auto">
+        <div>
+          <h1 className="text-2xl font-bold text-primary tracking-tight">Input Catatan Pelanggaran Sekuriti</h1>
+          <p className="text-sm text-muted-foreground">Gunakan formulir ini untuk mencatat pelanggaran kinerja anggota sekuriti demi perhitungan KPI bulanan.</p>
+        </div>
         <Card className="shadow-md">
-          <CardHeader>
-            <CardTitle className="text-xl font-bold text-primary">Input Catatan Pelanggaran Sekuriti</CardTitle>
-            <CardDescription>
-              Gunakan formulir ini untuk mencatat pelanggaran kinerja anggota sekuriti demi perhitungan KPI bulanan.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               {/* Anggota Dropdown */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-semibold text-foreground">Pilih Anggota Sekuriti</label>
+                <label className="text-sm font-semibold text-foreground">Pilih Personel (Anggota / Danru)</label>
                 <select
                   value={data.id_anggota}
                   onChange={(e) => setData("id_anggota", e.target.value)}
@@ -76,67 +160,47 @@ export default function InputPelanggaran({ anggota }: Props) {
                 {errors.id_anggota && <span className="text-xs text-destructive">{errors.id_anggota}</span>}
               </div>
 
-              {/* Tanggal Kejadian */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-semibold text-foreground">Tanggal Kejadian</label>
-                <input
-                  type="date"
-                  value={data.tanggal_kejadian}
-                  onChange={(e) => setData("tanggal_kejadian", e.target.value)}
-                  className="w-full p-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  required
-                />
-                {errors.tanggal_kejadian && <span className="text-xs text-destructive">{errors.tanggal_kejadian}</span>}
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                {/* Minggu Ke */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Tanggal Kejadian */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-semibold text-foreground">Minggu Ke</label>
-                  <select
-                    value={data.minggu_ke}
-                    onChange={(e) => setData("minggu_ke", parseInt(e.target.value))}
-                    className="w-full p-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    required
-                  >
-                    {[1, 2, 3, 4, 5].map((m) => (
-                      <option key={m} value={m}>Minggu {m}</option>
-                    ))}
-                  </select>
-                  {errors.minggu_ke && <span className="text-xs text-destructive">{errors.minggu_ke}</span>}
-                </div>
-
-                {/* Bulan */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-semibold text-foreground">Bulan</label>
-                  <select
-                    value={data.bulan}
-                    onChange={(e) => setData("bulan", e.target.value)}
-                    className="w-full p-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    required
-                  >
-                    {listBulan.map((b) => (
-                      <option key={b} value={b}>{b}</option>
-                    ))}
-                  </select>
-                  {errors.bulan && <span className="text-xs text-destructive">{errors.bulan}</span>}
-                </div>
-
-                {/* Tahun */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-semibold text-foreground">Tahun</label>
+                  <label className="text-sm font-semibold text-foreground">Tanggal Kejadian</label>
                   <input
-                    type="number"
-                    value={data.tahun}
-                    onChange={(e) => setData("tahun", parseInt(e.target.value))}
+                    type="date"
+                    value={data.tanggal_kejadian}
+                    onChange={(e) => handleDateChange(e.target.value)}
                     className="w-full p-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                     required
                   />
-                  {errors.tahun && <span className="text-xs text-destructive">{errors.tahun}</span>}
+                  {errors.tanggal_kejadian && <span className="text-xs text-destructive">{errors.tanggal_kejadian}</span>}
+                  <span className="text-xs text-muted-foreground/80 italic font-medium ml-1">
+                    Periode: Minggu Ke-{data.minggu_ke}, {data.bulan} {data.tahun}
+                  </span>
+                </div>
+
+                {/* Regu & Shift Jaga */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-semibold text-foreground">Regu</label>
+                    <input
+                      type="text"
+                      value={reguName}
+                      className="w-full p-2 border rounded-md bg-muted text-muted-foreground font-semibold cursor-not-allowed"
+                      disabled
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-semibold text-foreground">Shift Jaga</label>
+                    <input
+                      type="text"
+                      value={shiftName}
+                      className="w-full p-2 border rounded-md bg-muted text-muted-foreground font-semibold cursor-not-allowed"
+                      disabled
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Kategori Indikator */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-semibold text-foreground">Kategori Indikator</label>

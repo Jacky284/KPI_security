@@ -18,6 +18,9 @@ class LaporanMingguan extends Model
         'bulan',
         'tahun',
         'file_pdf_url',
+        'status_dokumen',
+        'ttd_danru_url',
+        'ttd_chief_url',
     ];
 
     public function danru(): BelongsTo

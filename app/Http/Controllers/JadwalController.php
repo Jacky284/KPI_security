@@ -1,0 +1,135 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use App\Models\User;
+use App\Models\Regu;
+use App\Models\JadwalBulanan;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
+
+class JadwalController extends Controller
+{
+    // Untuk role yang berhak mengatur jadwal (Admin, Danru, Chief)
+    public function manage(Request $request)
+    {
+        $user = Auth::user();
+        if (!in_array($user->role, ['Admin', 'Danru', 'Chief'])) {
+            abort(403);
+        }
+
+        $bulan = $request->query('bulan', Carbon::now()->format('m'));
+        $tahun = $request->query('tahun', Carbon::now()->format('Y'));
+
+        // Danru hanya bisa melihat anggota dari regunya
+        $query = User::where('role', 'Anggota');
+        if (strtolower(trim($user->role)) === 'danru') {
+            $query->where('regu', trim($user->regu));
+        }
+        
+        $anggotas = $query->get();
+        $jadwals = JadwalBulanan::where('bulan', $bulan)
+            ->where('tahun', $tahun)
+            ->whereIn('id_anggota', $anggotas->pluck('id_user'))
+            ->get()
+            ->keyBy('id_anggota');
+
+        return Inertia::render('Jadwal/Manage', [
+            'anggotas' => $anggotas,
+            'jadwals' => $jadwals,
+            'bulan' => $bulan,
+            'tahun' => $tahun,
+        ]);
+    }
+
+    public function store(Request $request)
+    {
+        $user = Auth::user();
+        if (!in_array($user->role, ['Admin', 'Danru', 'Chief'])) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'bulan' => 'required|string',
+            'tahun' => 'required|integer',
+            'jadwal' => 'required|array', // key is id_anggota, value is array of "day": "shift"
+        ]);
+
+        if (strtolower(trim($user->role)) === 'danru') {
+            $anggotaIds = array_keys($validated['jadwal']);
+            $validCount = User::whereIn('id_user', $anggotaIds)
+                              ->where('role', 'Anggota')
+                              ->where('regu', trim($user->regu))
+                              ->count();
+            if ($validCount !== count($anggotaIds)) {
+                abort(403, 'Akses ditolak. Anda mencoba menyimpan jadwal untuk anggota di luar regu Anda.');
+            }
+        }
+
+        foreach ($validated['jadwal'] as $id_anggota => $jadwal_harian) {
+            JadwalBulanan::updateOrCreate(
+                [
+                    'id_anggota' => $id_anggota,
+                    'bulan' => $validated['bulan'],
+                    'tahun' => $validated['tahun']
+                ],
+                [
+                    'id_danru_pembuat' => $user->id_user,
+                    'jadwal_harian' => $jadwal_harian
+                ]
+            );
+        }
+
+        return redirect()->back()->with('success', 'Jadwal berhasil disimpan!');
+    }
+
+    // Untuk menampilkan jadwal di dashboard (per minggu)
+    public function getJadwalMingguan(Request $request)
+    {
+        $user = Auth::user();
+        $startOfWeek = $request->query('start_date', Carbon::now()->startOfWeek()->format('Y-m-d'));
+        
+        // Logika untuk fetch data di UI dashboard...
+        // ... (This can be an API endpoint or part of LaporanController@dashboard)
+    }
+
+    public function exportMingguan(Request $request)
+    {
+        $user = Auth::user();
+        $type = $request->query('type', 'pdf');
+        
+        $startDateParam = $request->query('start_date', \Carbon\Carbon::now()->startOfWeek()->format('Y-m-d'));
+        
+        if ($type === 'excel') {
+            return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\JadwalMingguanExport($startDateParam), "jadwal_mingguan_{$startDateParam}.xlsx");
+        } else if ($type === 'pdf') {
+            $export = new \App\Exports\JadwalMingguanExport($startDateParam);
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.jadwal_mingguan', $export->view()->getData())
+                ->setPaper('a4', 'landscape');
+            return $pdf->stream("jadwal_mingguan_{$startDateParam}.pdf");
+        }
+
+        return redirect()->back()->with('error', 'Tipe export tidak valid');
+    }
+
+    public function exportBulanan(Request $request)
+    {
+        $user = Auth::user();
+        $type = $request->query('type', 'pdf');
+        $bulan = $request->query('bulan', \Carbon\Carbon::now()->format('m'));
+        $tahun = $request->query('tahun', \Carbon\Carbon::now()->format('Y'));
+
+        if ($type === 'excel') {
+            return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\JadwalBulananExport($bulan, $tahun), "jadwal_bulanan_{$bulan}_{$tahun}.xlsx");
+        } else if ($type === 'pdf') {
+            $export = new \App\Exports\JadwalBulananExport($bulan, $tahun);
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.jadwal_bulanan', $export->view()->getData())
+                ->setPaper('a3', 'landscape');
+            return $pdf->stream("jadwal_bulanan_{$bulan}_{$tahun}.pdf");
+        }
+
+        return redirect()->back()->with('error', 'Tipe export tidak valid');
+    }
+}

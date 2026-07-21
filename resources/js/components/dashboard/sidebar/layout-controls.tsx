@@ -27,10 +27,7 @@ export function LayoutControls() {
     theme_mode: themeMode,
     theme_preset: themePreset,
     content_layout: contentLayout,
-    navbar_style: navbarStyle,
     sidebar_variant: variant,
-    sidebar_collapsible: collapsible,
-    font,
   } = values;
 
   const onThemePresetChange = (preset: ThemePreset) => {
@@ -47,24 +44,9 @@ export function LayoutControls() {
     setPreference("content_layout", layout);
   };
 
-  const onNavbarStyleChange = (style: NavbarStyle | "") => {
-    if (!style) return;
-    setPreference("navbar_style", style);
-  };
-
   const onSidebarStyleChange = (value: SidebarVariant | "") => {
     if (!value) return;
     setPreference("sidebar_variant", value);
-  };
-
-  const onSidebarCollapseModeChange = (value: SidebarCollapsible | "") => {
-    if (!value) return;
-    setPreference("sidebar_collapsible", value);
-  };
-
-  const onFontChange = (value: FontKey | "") => {
-    if (!value) return;
-    setPreference("font", value);
   };
 
   return (
@@ -105,23 +87,7 @@ export function LayoutControls() {
               </Select>
             </div>
 
-            <div className="space-y-1">
-              <Label className="font-medium text-xs">Fonts</Label>
-              <Select value={font} onValueChange={onFontChange}>
-                <SelectTrigger size="sm" className="w-full text-xs">
-                  <SelectValue placeholder="Select font" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {fontOptions.map((font) => (
-                      <SelectItem key={font.key} className="text-xs" value={font.key}>
-                        {font.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
+
 
             <div className="space-y-1">
               <Label className="font-medium text-xs">Theme Mode</Label>
@@ -164,24 +130,7 @@ export function LayoutControls() {
               </ToggleGroup>
             </div>
 
-            <div className="space-y-1">
-              <Label className="font-medium text-xs">Navbar Behavior</Label>
-              <ToggleGroup
-                size="sm"
-                spacing={0}
-                variant="outline"
-                type="single"
-                value={navbarStyle}
-                onValueChange={onNavbarStyleChange}
-              >
-                <ToggleGroupItem value="sticky" aria-label="Toggle sticky">
-                  Sticky
-                </ToggleGroupItem>
-                <ToggleGroupItem value="scroll" aria-label="Toggle scroll">
-                  Scroll
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
+
 
             <div className="space-y-1">
               <Label className="font-medium text-xs">Sidebar Style</Label>
@@ -205,24 +154,7 @@ export function LayoutControls() {
               </ToggleGroup>
             </div>
 
-            <div className="space-y-1">
-              <Label className="font-medium text-xs">Sidebar Collapse Mode</Label>
-              <ToggleGroup
-                size="sm"
-                spacing={0}
-                variant="outline"
-                type="single"
-                value={collapsible}
-                onValueChange={onSidebarCollapseModeChange}
-              >
-                <ToggleGroupItem value="icon" aria-label="Toggle icon">
-                  Icon
-                </ToggleGroupItem>
-                <ToggleGroupItem value="offcanvas" aria-label="Toggle offcanvas">
-                  OffCanvas
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
+
 
             <Button type="button" size="sm" variant="outline" className="w-full text-xs" onClick={resetPreferences}>
               Restore Defaults

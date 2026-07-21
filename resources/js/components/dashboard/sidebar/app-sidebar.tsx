@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { Link, usePage } from "@inertiajs/react";
 import { CircleHelp, ClipboardList, Command, Database, File, Search, Settings, Users, LayoutDashboard, ListTodo, ReceiptText } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
@@ -12,6 +13,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { APP_CONFIG } from "@/config/app-config";
 import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
@@ -44,11 +46,35 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     })),
   );
 
-  const { auth } = usePage().props as any;
+  const { setOpenMobile } = useSidebar();
+  const page = usePage();
+  const { auth } = page.props as any;
+  const url = page.url;
   const user = auth?.user;
   const userRole = user?.role;
 
+  useEffect(() => {
+    setOpenMobile(false);
+  }, [url, setOpenMobile]);
+
   const itemsToRender = userRole === "Admin" ? [...adminItems, ...sidebarItems] : sidebarItems;
+  const filteredItems = itemsToRender.map(group => {
+    return {
+      ...group,
+      items: group.items.filter(item => {
+        if (item.id === "jadwal-manage") {
+          return ["Admin", "Danru"].includes(userRole);
+        }
+        if (item.id === "input-pelanggaran") {
+          return ["Admin", "Chief", "Danru"].includes(userRole);
+        }
+        if (item.id === "anggota") {
+          return ["Admin", "Chief", "Danru"].includes(userRole);
+        }
+        return true;
+      })
+    };
+  });
 
   const loggedInUser = user ? {
     name: user.nama_lengkap,
@@ -78,7 +104,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={itemsToRender} />
+        <NavMain items={filteredItems} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={loggedInUser} />

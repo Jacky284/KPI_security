@@ -29,7 +29,7 @@ class LoginController extends Controller
             if ($user->role === 'Admin') {
                 return redirect()->intended('/admin/users');
             }
-            return redirect()->intended('/laporan');
+            return redirect()->intended('/');
         }
 
         return back()->withErrors([

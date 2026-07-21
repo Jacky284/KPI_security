@@ -20,6 +20,7 @@ class CatatanPelanggaran extends Model
         'kategori_indikator',
         'tingkat_pelanggaran',
         'deskripsi_kejadian',
+        'status_tindak_lanjut',
     ];
 
     public function anggota(): BelongsTo

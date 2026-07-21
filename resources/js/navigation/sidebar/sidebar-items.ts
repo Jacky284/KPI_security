@@ -62,13 +62,31 @@ export interface NavGroup {
 export const sidebarItems: NavGroup[] = [
   {
     id: 1,
-    label: "Sistem PMS Security",
+    label: "",
     items: [
       {
         id: "default",
         title: "Default Dashboard",
         url: "/",
         icon: LayoutDashboard,
+      },
+    ],
+  },
+  {
+    id: 2,
+    label: "Manajemen & Operasional",
+    items: [
+      {
+        id: "anggota",
+        title: "Manajemen Anggota",
+        url: "/anggota",
+        icon: Users,
+      },
+      {
+        id: "jadwal-manage",
+        title: "Manajemen Jadwal",
+        url: "/jadwal/manage",
+        icon: Calendar,
       },
       {
         id: "input-pelanggaran",
@@ -77,9 +95,27 @@ export const sidebarItems: NavGroup[] = [
         icon: ListTodo,
       },
       {
-        id: "dashboard-laporan",
-        title: "Dashboard Laporan",
-        url: "/laporan",
+        id: "daftar-pelanggaran",
+        title: "Daftar Pelanggaran",
+        url: "/pelanggaran/daftar",
+        icon: CheckSquare,
+      },
+    ],
+  },
+  {
+    id: 3,
+    label: "Laporan & Evaluasi",
+    items: [
+      {
+        id: "laporan-mingguan",
+        title: "Laporan Mingguan",
+        url: "/laporan/mingguan",
+        icon: ReceiptText,
+      },
+      {
+        id: "laporan-bulanan",
+        title: "Laporan Bulanan",
+        url: "/laporan/bulanan",
         icon: ReceiptText,
       },
     ],
