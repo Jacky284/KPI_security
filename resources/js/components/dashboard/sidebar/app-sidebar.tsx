@@ -57,13 +57,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     setOpenMobile(false);
   }, [url, setOpenMobile]);
 
-  const itemsToRender = userRole === "Admin" ? [...adminItems, ...sidebarItems] : sidebarItems;
+  const itemsToRender = ["Admin", "Chief"].includes(userRole) ? [...adminItems, ...sidebarItems] : sidebarItems;
   const filteredItems = itemsToRender.map(group => {
     return {
       ...group,
       items: group.items.filter(item => {
         if (item.id === "jadwal-manage") {
-          return ["Admin", "Danru"].includes(userRole);
+          return ["Admin", "Chief"].includes(userRole);
         }
         if (item.id === "input-pelanggaran") {
           return ["Admin", "Chief", "Danru"].includes(userRole);

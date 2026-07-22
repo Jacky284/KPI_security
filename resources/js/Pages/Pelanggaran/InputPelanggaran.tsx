@@ -27,38 +27,69 @@ export default function InputPelanggaran({ anggota, jadwals }: Props) {
   const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const initialAnggotaId = urlParams ? urlParams.get("id_anggota") || "" : "";
 
+
+
+  const calculateWeekNumber = (dateStr: string) => {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const year = y;
+    const monthIndex = m - 1;
+    const day = d;
+    const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    const bulanStr = months[monthIndex];
+
+    const firstOfMonth = new Date(year, monthIndex, 1);
+    const dayOfWeek = firstOfMonth.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+
+    let startOfWeek1 = new Date(firstOfMonth);
+
+    if (dayOfWeek === 6) {
+      startOfWeek1 = new Date(firstOfMonth);
+    } else if (dayOfWeek === 0 || dayOfWeek === 1 || dayOfWeek === 2) {
+      const daysToSubtract = (dayOfWeek + 1);
+      startOfWeek1.setDate(startOfWeek1.getDate() - daysToSubtract);
+    } else {
+      const daysToAdd = 6 - dayOfWeek;
+      startOfWeek1.setDate(startOfWeek1.getDate() + daysToAdd);
+    }
+
+    startOfWeek1.setHours(0, 0, 0, 0);
+    const targetDate = new Date(year, monthIndex, day);
+    targetDate.setHours(0, 0, 0, 0);
+
+    let weekNum = 1;
+    if (targetDate >= startOfWeek1) {
+      const diffTime = targetDate.getTime() - startOfWeek1.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
+      weekNum = Math.floor(diffDays / 7) + 1;
+    }
+
+    if (weekNum > 4) weekNum = 4;
+    if (weekNum < 1) weekNum = 1;
+
+    return {
+      tahun: year,
+      bulan: bulanStr,
+      minggu_ke: weekNum
+    };
+  };
+
   const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth();
-  const day = today.getDate();
-  const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-  const bulanStr = months[month];
-  
-  const firstDay = new Date(year, month, 1);
-  const firstDayOfWeek = (firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1);
-  const mingguKe = Math.ceil((day + firstDayOfWeek) / 7);
+  const todayStr = today.toISOString().split("T")[0];
+  const initialWeekDetails = calculateWeekNumber(todayStr);
 
   const { data, setData, post, processing, errors, reset, wasSuccessful } = useForm({
     id_anggota: initialAnggotaId,
-    tanggal_kejadian: today.toISOString().split("T")[0],
-    minggu_ke: mingguKe,
-    bulan: bulanStr,
-    tahun: year,
+    tanggal_kejadian: todayStr,
+    minggu_ke: initialWeekDetails.minggu_ke,
+    bulan: initialWeekDetails.bulan,
+    tahun: initialWeekDetails.tahun,
     kategori_indikator: "Kedisiplinan",
     tingkat_pelanggaran: "Ringan",
     deskripsi_kejadian: "",
   });
 
   const getAvailableWeeks = (bulanStr: string, tahun: number) => {
-    const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-    const monthIndex = months.indexOf(bulanStr);
-    if (monthIndex === -1) return [1, 2, 3, 4, 5];
-    const firstDay = new Date(tahun, monthIndex, 1);
-    const lastDay = new Date(tahun, monthIndex + 1, 0);
-    const numDays = lastDay.getDate();
-    const firstDayOfWeek = (firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1);
-    const totalWeeks = Math.ceil((numDays + firstDayOfWeek) / 7);
-    return Array.from({ length: totalWeeks }, (_, i) => i + 1);
+    return [1, 2, 3, 4];
   };
 
   const availableWeeks = getAvailableWeeks(data.bulan, data.tahun);
@@ -69,24 +100,14 @@ export default function InputPelanggaran({ anggota, jadwals }: Props) {
       return;
     }
     
-    const [y, m, d] = dateStr.split('-');
-    const year = parseInt(y);
-    const month = parseInt(m) - 1;
-    const day = parseInt(d);
-
-    const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-    const bulanStr = months[month];
-    
-    const firstDay = new Date(year, month, 1);
-    const firstDayOfWeek = (firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1);
-    const mingguKe = Math.ceil((day + firstDayOfWeek) / 7);
+    const weekDetails = calculateWeekNumber(dateStr);
 
     setData({
       ...data,
       tanggal_kejadian: dateStr,
-      tahun: year,
-      bulan: bulanStr,
-      minggu_ke: mingguKe
+      tahun: weekDetails.tahun,
+      bulan: weekDetails.bulan,
+      minggu_ke: weekDetails.minggu_ke
     });
   };
 

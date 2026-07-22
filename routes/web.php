@@ -57,4 +57,5 @@ Route::middleware('auth')->group(function () {
     Route::get('/export/jadwal-bulanan', [JadwalController::class, 'exportBulanan'])->name('export.jadwal.bulanan');
     Route::get('/export/laporan', [LaporanController::class, 'exportLaporan'])->name('export.laporan');
     Route::get('/export/laporan-bulanan', [LaporanController::class, 'exportLaporanBulanan'])->name('export.laporan.bulanan');
+    Route::get('/export/pelanggaran', [PelanggaranController::class, 'exportPelanggaran'])->name('export.pelanggaran');
 });

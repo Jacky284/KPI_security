@@ -49,11 +49,11 @@ interface Props {
   currentStartDate?: string;
   currentBulan?: string;
   currentTahun?: number;
-  trendSiang?: TrendData[];
+  trendPagi?: TrendData[];
   trendMalam?: TrendData[];
 }
 
-export default function Page({ anggota, danrus, currentUser, weekDates, jadwalMingguan, currentStartDate, currentBulan, currentTahun, trendSiang, trendMalam }: Props) {
+export default function Page({ anggota, danrus, currentUser, weekDates, jadwalMingguan, currentStartDate, currentBulan, currentTahun, trendPagi, trendMalam }: Props) {
   const isChiefOrAdmin = currentUser.role === "Chief" || currentUser.role === "Admin";
   
   const navigateWeek = (direction: 'prev' | 'next') => {
@@ -91,12 +91,20 @@ export default function Page({ anggota, danrus, currentUser, weekDates, jadwalMi
     return <Minus className="size-5 text-muted-foreground mx-auto opacity-50" title="Minggu belum terlewati" />;
   };
 
+  const sortedDanrus = React.useMemo(() => {
+    if (!danrus) return [];
+    return [...danrus].sort((a, b) => {
+      const reguA = a.regu || '';
+      const reguB = b.regu || '';
+      return reguA.localeCompare(reguB, undefined, { numeric: true, sensitivity: 'base' });
+    });
+  }, [danrus]);
+
   return (
     <>
-      <Head title="Dashboard" />
+      <Head title="Dashboard Utama" />
       <div className="flex flex-col gap-6 max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-primary uppercase tracking-tight">
               Dashboard {currentUser.role}
@@ -131,14 +139,12 @@ export default function Page({ anggota, danrus, currentUser, weekDates, jadwalMi
                       <th className="p-3 font-semibold text-center text-muted-foreground border-r">Minggu 1</th>
                       <th className="p-3 font-semibold text-center text-muted-foreground border-r">Minggu 2</th>
                       <th className="p-3 font-semibold text-center text-muted-foreground border-r">Minggu 3</th>
-                      <th className="p-3 font-semibold text-center text-muted-foreground border-r">Minggu 4</th>
-                      <th className="p-3 font-semibold text-center text-muted-foreground border-r">Minggu 5</th>
-                      <th className="p-3 font-semibold text-center text-muted-foreground">Minggu 6</th>
+                      <th className="p-3 font-semibold text-center text-muted-foreground">Minggu 4</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {danrus && danrus.length > 0 ? (
-                      danrus.map((d, index) => (
+                    {sortedDanrus && sortedDanrus.length > 0 ? (
+                      sortedDanrus.map((d, index) => (
                         <tr key={d.id_user} className="border-b last:border-0 hover:bg-muted/10 transition-colors">
                           <td className="p-3 text-center text-muted-foreground font-mono text-xs border-r">{index + 1}</td>
                           <td className="p-3 font-bold text-foreground border-r">{d.nama_lengkap}</td>
@@ -146,14 +152,12 @@ export default function Page({ anggota, danrus, currentUser, weekDates, jadwalMi
                           <td className="p-3 text-center border-r">{renderStatusIcon(d.mingguan_status.minggu_1)}</td>
                           <td className="p-3 text-center border-r">{renderStatusIcon(d.mingguan_status.minggu_2)}</td>
                           <td className="p-3 text-center border-r">{renderStatusIcon(d.mingguan_status.minggu_3)}</td>
-                          <td className="p-3 text-center border-r">{renderStatusIcon(d.mingguan_status.minggu_4)}</td>
-                          <td className="p-3 text-center border-r">{renderStatusIcon(d.mingguan_status.minggu_5)}</td>
-                          <td className="p-3 text-center">{renderStatusIcon(d.mingguan_status.minggu_6)}</td>
+                          <td className="p-3 text-center">{renderStatusIcon(d.mingguan_status.minggu_4)}</td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={9} className="p-8 text-center text-muted-foreground">
+                        <td colSpan={7} className="p-8 text-center text-muted-foreground">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <AlertTriangle className="size-8 text-muted-foreground/50" />
                             <p>Tidak ada data Danru ditemukan.</p>
@@ -167,8 +171,8 @@ export default function Page({ anggota, danrus, currentUser, weekDates, jadwalMi
 
               {/* Mobile View */}
               <div className="lg:hidden flex flex-col gap-4 p-4">
-                {danrus && danrus.length > 0 ? (
-                  danrus.map((d, index) => (
+                {sortedDanrus && sortedDanrus.length > 0 ? (
+                  sortedDanrus.map((d, index) => (
                     <div key={d.id_user} className="flex flex-col gap-3 p-4 border rounded-xl bg-card shadow-sm">
                       <div className="flex justify-between items-start">
                         <div className="flex gap-3 items-center">
@@ -179,8 +183,8 @@ export default function Page({ anggota, danrus, currentUser, weekDates, jadwalMi
                           </div>
                         </div>
                       </div>
-                      <div className="grid grid-cols-3 gap-2 mt-2 pt-3 border-t">
-                        {[1, 2, 3, 4, 5, 6].map((m) => {
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 pt-3 border-t">
+                        {[1, 2, 3, 4].map((m) => {
                            const key = `minggu_${m}` as keyof typeof d.mingguan_status;
                            return (
                              <div key={m} className="flex flex-col items-center p-2 bg-muted/30 rounded-lg border text-xs">
@@ -344,56 +348,43 @@ export default function Page({ anggota, danrus, currentUser, weekDates, jadwalMi
               </CardContent>
             </Card>
 
-            <div className="hidden lg:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-              {anggota && anggota.map((person) => (
-                <Card key={person.id_user} className="shadow-xs border-2 hover:border-primary/25 transition-all">
-                  <CardHeader className="pb-4 flex flex-row items-center justify-between gap-2">
-                    <div className="flex flex-row items-center gap-3 min-w-0">
-                      <div className="size-10 shrink-0 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-lg">
-                        {person.nama_lengkap.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="min-w-0 pr-2">
-                        <CardTitle className="text-sm font-bold truncate">
-                          <Link href={`/anggota/${person.id_user}`} className="hover:underline hover:text-primary transition-colors">
-                            {person.nama_lengkap}
-                          </Link>
-                        </CardTitle>
-                        <CardDescription className="text-xs uppercase truncate">{person.regu || "Tanpa Regu"}</CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0 flex flex-col gap-3">
-                    <Button asChild size="sm" variant="outline" className="w-full gap-1 border-primary/20 text-primary hover:bg-primary/5 font-bold text-xs uppercase">
-                      <Link href={`/pelanggaran?id_anggota=${person.id_user}`}>
-                        <AlertTriangle className="size-3.5" />
-                        Catat Pelanggaran
-                      </Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {/* Performance Charts (Siang vs Malam) */}
-            {trendSiang && trendMalam && anggota && anggota.length > 0 && (
+            {/* Performance Charts (Pagi vs Malam) */}
+            {trendPagi && trendMalam && anggota && anggota.length > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                 <Card className="shadow-xs border-2">
                   <CardHeader className="bg-muted/30 border-b pb-4">
                     <CardTitle className="text-md font-bold flex items-center gap-2">
                       <Activity className="size-5 text-primary" />
-                      Tren Kinerja: Shift Siang (3 Bulan)
+                      Tren Kinerja: Shift Pagi (3 Bulan)
                     </CardTitle>
-                    <CardDescription>Skor kedisiplinan & performa anggota regu selama bertugas siang hari.</CardDescription>
+                    <CardDescription>Skor kedisiplinan & performa anggota regu selama bertugas pagi hari.</CardDescription>
                   </CardHeader>
                   <CardContent className="pt-6">
                     <div className="h-[300px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={trendSiang} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                        <LineChart data={trendPagi} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
                           <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
                           <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12 }} domain={[0, 100]} />
                           <RechartsTooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                          <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                          <Legend
+                            content={() => (
+                              <div className="flex flex-wrap justify-center items-center gap-x-5 gap-y-2 text-xs pt-4 px-2">
+                                {anggota.map((person, idx) => {
+                                  const color = `hsl(${(idx * 137.5) % 360}, 70%, 45%)`;
+                                  return (
+                                    <div key={person.id_user} className="flex items-center gap-1.5 shrink-0">
+                                      <svg className="w-4 h-2 shrink-0" viewBox="0 0 24 10">
+                                        <line x1="0" y1="5" x2="24" y2="5" stroke={color} strokeWidth="3" />
+                                        <circle cx="12" cy="5" r="3.5" fill="#ffffff" stroke={color} strokeWidth="2" />
+                                      </svg>
+                                      <span className="font-medium text-foreground text-[11px] whitespace-nowrap">{person.nama_lengkap}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          />
                           {anggota.map((person, idx) => (
                             <Line
                               key={person.id_user}
@@ -427,13 +418,30 @@ export default function Page({ anggota, danrus, currentUser, weekDates, jadwalMi
                           <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
                           <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12 }} domain={[0, 100]} />
                           <RechartsTooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                          <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                          <Legend
+                            content={() => (
+                              <div className="flex flex-wrap justify-center items-center gap-x-5 gap-y-2 text-xs pt-4 px-2">
+                                {anggota.map((person, idx) => {
+                                  const color = `hsl(${(idx * 137.5) % 360}, 70%, 45%)`;
+                                  return (
+                                    <div key={person.id_user} className="flex items-center gap-1.5 shrink-0">
+                                      <svg className="w-4 h-2 shrink-0" viewBox="0 0 24 10">
+                                        <line x1="0" y1="5" x2="24" y2="5" stroke={color} strokeWidth="3" />
+                                        <circle cx="12" cy="5" r="3.5" fill="#ffffff" stroke={color} strokeWidth="2" />
+                                      </svg>
+                                      <span className="font-medium text-foreground text-[11px] whitespace-nowrap">{person.nama_lengkap}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          />
                           {anggota.map((person, idx) => (
                             <Line
                               key={person.id_user}
                               type="monotone"
                               dataKey={person.nama_lengkap}
-                              stroke={`hsl(${(idx * 137.5 + 180) % 360}, 70%, 50%)`}
+                              stroke={`hsl(${(idx * 137.5) % 360}, 70%, 50%)`}
                               strokeWidth={2}
                               dot={{ r: 4, strokeWidth: 2 }}
                               activeDot={{ r: 6 }}
@@ -446,6 +454,37 @@ export default function Page({ anggota, danrus, currentUser, weekDates, jadwalMi
                 </Card>
               </div>
             )}
+
+            {/* Anggota Cards Grid */}
+            <div className="hidden lg:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+              {anggota && anggota.map((person) => (
+                <Card key={person.id_user} className="shadow-xs border-2 hover:border-primary/25 transition-all">
+                  <CardHeader className="pb-4 flex flex-row items-center justify-between gap-2">
+                    <div className="flex flex-row items-center gap-3 min-w-0">
+                      <div className="size-10 shrink-0 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-lg">
+                        {person.nama_lengkap.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0 pr-2">
+                        <CardTitle className="text-sm font-bold truncate">
+                          <Link href={`/anggota/${person.id_user}`} className="hover:underline hover:text-primary transition-colors">
+                            {person.nama_lengkap}
+                          </Link>
+                        </CardTitle>
+                        <CardDescription className="text-xs uppercase truncate">{person.regu || "Tanpa Regu"}</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0 flex flex-col gap-3">
+                    <Button asChild size="sm" variant="outline" className="w-full gap-1 border-primary/20 text-primary hover:bg-primary/5 font-bold text-xs uppercase">
+                      <Link href={`/pelanggaran?id_anggota=${person.id_user}`}>
+                        <AlertTriangle className="size-3.5" />
+                        Catat Pelanggaran
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </>
         )}
       </div>

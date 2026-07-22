@@ -156,15 +156,7 @@ export default function LaporanBulanan({
   };
 
   const getAvailableWeeks = (bulanStr: string, tahun: number) => {
-    const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-    const monthIndex = months.indexOf(bulanStr);
-    if (monthIndex === -1) return [1, 2, 3, 4, 5];
-    const firstDay = new Date(tahun, monthIndex, 1);
-    const lastDay = new Date(tahun, monthIndex + 1, 0);
-    const numDays = lastDay.getDate();
-    const firstDayOfWeek = (firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1);
-    const totalWeeks = Math.ceil((numDays + firstDayOfWeek) / 7);
-    return Array.from({ length: totalWeeks }, (_, i) => i + 1);
+    return [1, 2, 3, 4];
   };
 
   const availableWeeks = getAvailableWeeks(selectedBulan, selectedTahun);

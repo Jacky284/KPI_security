@@ -60,7 +60,7 @@
                     <td class="text-left">{{ $anggota->nama_lengkap }}</td>
                     @foreach($weekDates as $wd)
                         <td class="text-center">
-                            {{ $jadwalData[$anggota->id_user][$wd['date']] ?? 'Libur' }}
+                            {{ (isset($jadwalData[$anggota->id_user][$wd['date']]) && $jadwalData[$anggota->id_user][$wd['date']] !== 'Libur') ? $jadwalData[$anggota->id_user][$wd['date']] : '-' }}
                         </td>
                     @endforeach
                 </tr>

@@ -26,19 +26,17 @@ class AnggotaController extends Controller
 
         $user = Auth::user();
         
-        // If Chief, show Danru instead of Anggota
-        if ($user->role === 'Chief') {
-            $query = User::where('role', 'Danru');
+        $userRole = strtolower(trim($user->role));
+        
+        if ($userRole === 'chief' || $userRole === 'admin') {
+            $query = User::whereIn('role', ['Danru', 'Anggota'])->where('status_aktif', 1);
+        } else if ($userRole === 'danru') {
+            $query = User::where('role', 'Anggota')->where('status_aktif', 1)->where('regu', trim($user->regu));
         } else {
-            $query = User::where('role', 'Anggota');
-            
-            // If Danru, only show their own regu members
-            if ($user->role === 'Danru') {
-                $query->where('regu', trim($user->regu));
-            }
+            $query = User::where('role', 'Anggota')->where('status_aktif', 1);
         }
 
-        $anggota = $query->orderBy('nama_lengkap', 'asc')->get();
+        $anggota = $query->orderBy('regu', 'asc')->orderBy('nama_lengkap', 'asc')->get();
 
         $now = Carbon::now();
         $currentMonth = str_pad($now->month, 2, '0', STR_PAD_LEFT);
@@ -66,6 +64,7 @@ class AnggotaController extends Controller
             return [
                 'id_user' => $user->id_user,
                 'nama_lengkap' => $user->nama_lengkap,
+                'role' => $user->role,
                 'regu' => $user->regu,
                 'foto_profil' => $user->foto_profil,
                 'usia' => $usia,
@@ -113,7 +112,7 @@ class AnggotaController extends Controller
             ->where('tahun', $currentYear)
             ->first();
 
-        // 3. Generate 3-Month Performance Data (Siang vs Malam)
+        // 3. Generate 3-Month Performance Data (Pagi vs Malam)
         // Basic Logic: Start with 100 base score per shift category, subtract based on violations.
         // A simple way to approximate this without knowing every single schedule day is:
         // We look at the last 3 months.
@@ -138,65 +137,94 @@ class AnggotaController extends Controller
                 ->where('tahun', $tYear)
                 ->first();
                 
-            $scoreSiang = 100;
-            $scoreMalam = 100;
+            $hasPagiShift = false;
+            $hasMalamShift = false;
+            if ($jadwalThatMonth && is_array($jadwalThatMonth->jadwal_harian)) {
+                foreach ($jadwalThatMonth->jadwal_harian as $d => $sStr) {
+                    $lower = strtolower((string)$sStr);
+                    if (strpos($lower, 'pagi') !== false || strpos($lower, 'siang') !== false) {
+                        $hasPagiShift = true;
+                    } elseif (strpos($lower, 'malam') !== false) {
+                        $hasMalamShift = true;
+                    }
+                }
+            }
+
+            $pagiDeduction = 0;
+            $malamDeduction = 0;
 
             foreach ($violationsThisMonth as $v) {
-                // Deduction points (Ringan: -5, Sedang: -10, Berat: -25)
                 $deduction = 5;
                 if ($v->tingkat_pelanggaran === 'Sedang') $deduction = 10;
                 if ($v->tingkat_pelanggaran === 'Berat') $deduction = 25;
 
-                // Determine shift from schedule
-                $shift = 'Siang'; // default
-                if ($jadwalThatMonth && $jadwalThatMonth->jadwal_harian) {
+                $shift = 'Libur';
+                if ($jadwalThatMonth && is_array($jadwalThatMonth->jadwal_harian)) {
                     $day = Carbon::parse($v->tanggal_kejadian)->format('j');
                     $dailyShift = $jadwalThatMonth->jadwal_harian[$day] ?? 'Libur';
-                    if (strpos(strtolower($dailyShift), 'malam') !== false) {
+                    $lowerD = strtolower((string)$dailyShift);
+                    if (strpos($lowerD, 'malam') !== false) {
                         $shift = 'Malam';
-                    } else if (strpos(strtolower($dailyShift), 'pagi') !== false || strpos(strtolower($dailyShift), 'siang') !== false) {
-                        $shift = 'Siang';
+                    } elseif (strpos($lowerD, 'pagi') !== false || strpos($lowerD, 'siang') !== false) {
+                        $shift = 'Pagi';
                     }
                 }
 
                 if ($shift === 'Malam') {
-                    $scoreMalam -= $deduction;
-                } else {
-                    $scoreSiang -= $deduction;
+                    $malamDeduction += $deduction;
+                } elseif ($shift === 'Pagi') {
+                    $pagiDeduction += $deduction;
                 }
             }
 
-            // Ensure scores don't drop below 0
-            $scoreSiang = max(0, $scoreSiang);
-            $scoreMalam = max(0, $scoreMalam);
+            $scorePagi = $hasPagiShift ? max(0, 100 - $pagiDeduction) : 0;
+            $scoreMalam = $hasMalamShift ? max(0, 100 - $malamDeduction) : 0;
 
             $trendData[] = [
                 'name' => substr($tBulanStr, 0, 3), // e.g. "Mei", "Jun", "Jul"
-                'Siang' => $scoreSiang,
+                'Pagi' => $scorePagi,
                 'Malam' => $scoreMalam,
             ];
         }
 
         // 4. Calculate Indicator Breakdown (Last 3 Months Aggregated)
-        $indicatorScores = [];
-        // Default Indicators
-        $defaultIndicators = ['Kedisiplinan', 'Kerapihan', 'Komunikasi', 'Pelayanan', 'Integritas'];
+        $indicatorDeductionPagi = [];
+        $indicatorDeductionMalam = [];
+        $indicatorHasPagi = [];
+        $indicatorHasMalam = [];
+
+        $defaultIndicators = ['Kedisiplinan', 'Kehadiran', 'Kerapihan', 'Komunikasi'];
         foreach ($defaultIndicators as $ind) {
-            $indicatorScores[$ind] = ['name' => $ind, 'Siang' => 100, 'Malam' => 100];
+            $indicatorDeductionPagi[$ind] = 0;
+            $indicatorDeductionMalam[$ind] = 0;
+            $indicatorHasPagi[$ind] = false;
+            $indicatorHasMalam[$ind] = false;
         }
 
-        // Fetch all violations for the last 3 months
+        // Check overall scheduled shifts in last 3 months
         $startOf3Months = $now->copy()->subMonths(2)->startOfMonth();
-        $violations3Months = CatatanPelanggaran::where('id_anggota', $id)
-            ->whereDate('tanggal_kejadian', '>=', $startOf3Months)
-            ->get();
-            
         $jadwal3Months = JadwalBulanan::where('id_anggota', $id)
             ->where(function($q) use ($startOf3Months, $now) {
-                // simple approximation, just fetch all in current year and previous year
                 $q->whereIn('tahun', [$startOf3Months->year, $now->year]);
             })
             ->get()->keyBy(function($j) { return $j->tahun . '-' . str_pad($j->bulan, 2, '0', STR_PAD_LEFT); });
+
+        foreach ($jadwal3Months as $j) {
+            if (is_array($j->jadwal_harian)) {
+                foreach ($j->jadwal_harian as $d => $sStr) {
+                    $lower = strtolower((string)$sStr);
+                    if (strpos($lower, 'pagi') !== false || strpos($lower, 'siang') !== false) {
+                        foreach ($defaultIndicators as $ind) $indicatorHasPagi[$ind] = true;
+                    } elseif (strpos($lower, 'malam') !== false) {
+                        foreach ($defaultIndicators as $ind) $indicatorHasMalam[$ind] = true;
+                    }
+                }
+            }
+        }
+
+        $violations3Months = CatatanPelanggaran::where('id_anggota', $id)
+            ->whereDate('tanggal_kejadian', '>=', $startOf3Months)
+            ->get();
 
         foreach ($violations3Months as $v) {
             $deduction = 5;
@@ -204,33 +232,48 @@ class AnggotaController extends Controller
             if ($v->tingkat_pelanggaran === 'Berat') $deduction = 25;
 
             $kategori = $v->kategori_indikator ?: 'Lainnya';
-            if (!isset($indicatorScores[$kategori])) {
-                $indicatorScores[$kategori] = ['name' => $kategori, 'Siang' => 100, 'Malam' => 100];
+            if (!isset($indicatorDeductionPagi[$kategori])) {
+                $indicatorDeductionPagi[$kategori] = 0;
+                $indicatorDeductionMalam[$kategori] = 0;
+                $indicatorHasPagi[$kategori] = true;
+                $indicatorHasMalam[$kategori] = true;
             }
 
             $vDate = Carbon::parse($v->tanggal_kejadian);
             $jKey = $vDate->year . '-' . str_pad($vDate->month, 2, '0', STR_PAD_LEFT);
             $jadwalThatMonth = $jadwal3Months->get($jKey);
 
-            $shift = 'Siang';
-            if ($jadwalThatMonth && $jadwalThatMonth->jadwal_harian) {
+            $shift = 'Libur';
+            if ($jadwalThatMonth && is_array($jadwalThatMonth->jadwal_harian)) {
                 $day = $vDate->format('j');
                 $dailyShift = $jadwalThatMonth->jadwal_harian[$day] ?? 'Libur';
-                if (strpos(strtolower($dailyShift), 'malam') !== false) {
+                $lowerD = strtolower((string)$dailyShift);
+                if (strpos($lowerD, 'malam') !== false) {
                     $shift = 'Malam';
-                } else if (strpos(strtolower($dailyShift), 'pagi') !== false || strpos(strtolower($dailyShift), 'siang') !== false) {
-                    $shift = 'Siang';
+                } elseif (strpos($lowerD, 'pagi') !== false || strpos($lowerD, 'siang') !== false) {
+                    $shift = 'Pagi';
                 }
             }
 
             if ($shift === 'Malam') {
-                $indicatorScores[$kategori]['Malam'] = max(0, $indicatorScores[$kategori]['Malam'] - $deduction);
-            } else {
-                $indicatorScores[$kategori]['Siang'] = max(0, $indicatorScores[$kategori]['Siang'] - $deduction);
+                $indicatorDeductionMalam[$kategori] += $deduction;
+            } elseif ($shift === 'Pagi') {
+                $indicatorDeductionPagi[$kategori] += $deduction;
             }
         }
 
-        $indicatorTrendData = array_values($indicatorScores);
+        $indicatorTrendData = [];
+        foreach ($indicatorDeductionPagi as $ind => $pDeduction) {
+            $mDeduction = $indicatorDeductionMalam[$ind];
+            $hPagi = $indicatorHasPagi[$ind];
+            $hMalam = $indicatorHasMalam[$ind];
+
+            $indicatorTrendData[] = [
+                'name' => $ind,
+                'Pagi' => $hPagi ? max(0, 100 - $pDeduction) : 0,
+                'Malam' => $hMalam ? max(0, 100 - $mDeduction) : 0,
+            ];
+        }
 
         return Inertia::render('Anggota/Detail', [
             'anggota' => $anggota,

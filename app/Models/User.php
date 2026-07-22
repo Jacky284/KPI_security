@@ -47,7 +47,7 @@ class User extends Authenticatable
 
     public function penilaianPelanggaran(): HasMany
     {
-        return $this->hasMany(CatatanPelanggaran::class, 'id_danru_penilai', 'id_user');
+        return $this->hasMany(CatatanPelanggaran::class, 'id_penilai', 'id_user');
     }
 
     public function laporanBulanan(): HasMany

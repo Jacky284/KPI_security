@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 interface Pelanggaran {
   id_catatan: number;
   id_anggota: number;
-  id_danru_penilai: number;
+  id_penilai: number;
   tanggal_kejadian: string;
   minggu_ke: number;
   bulan: string;
@@ -41,6 +41,15 @@ interface Props {
 export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan, selectedTahun, selectedMinggu, filterRegu, reguList }: Props) {
   const [processingId, setProcessingId] = useState<number | null>(null);
 
+  const formatDateDMY = (dateStr: string | null) => {
+    if (!dateStr) return "-";
+    const parts = dateStr.split("-");
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return dateStr;
+  };
+
   const handleTindakLanjut = (id: number) => {
     if (confirm("Tandai pelanggaran ini sudah ditindaklanjuti?")) {
       setProcessingId(id);
@@ -70,15 +79,7 @@ export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan
   ];
 
   const getAvailableWeeks = (bulanStr: string, tahun: number) => {
-    const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-    const monthIndex = months.indexOf(bulanStr);
-    if (monthIndex === -1) return [1, 2, 3, 4, 5];
-    const firstDay = new Date(tahun, monthIndex, 1);
-    const lastDay = new Date(tahun, monthIndex + 1, 0);
-    const numDays = lastDay.getDate();
-    const firstDayOfWeek = (firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1);
-    const totalWeeks = Math.ceil((numDays + firstDayOfWeek) / 7);
-    return Array.from({ length: totalWeeks }, (_, i) => i + 1);
+    return [1, 2, 3, 4];
   };
 
   const availableWeeks = getAvailableWeeks(selectedBulan, selectedTahun);
@@ -90,7 +91,7 @@ export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan
     }
     const params: any = { bulan, minggu_ke: minggu, tahun };
     if (regu) params.filter_regu = regu;
-    router.get("/pelanggaran", params);
+    router.get("/pelanggaran/daftar", params);
   };
 
   return (
@@ -149,6 +150,19 @@ export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan
               </div>
             )}
           </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-2 md:border-l md:pl-4 md:ml-auto w-full md:w-auto">
+            <Button asChild variant="outline" size="sm" className="w-full sm:w-auto bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200">
+              <a href={`/export/pelanggaran?type=excel&minggu_ke=${selectedMinggu}&bulan=${selectedBulan}&tahun=${selectedTahun}${filterRegu ? `&filter_regu=${filterRegu}` : ''}`} target="_blank">
+                Export Excel
+              </a>
+            </Button>
+            <Button asChild variant="outline" size="sm" className="w-full sm:w-auto bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 border-red-200">
+              <a href={`/export/pelanggaran?type=pdf&minggu_ke=${selectedMinggu}&bulan=${selectedBulan}&tahun=${selectedTahun}${filterRegu ? `&filter_regu=${filterRegu}` : ''}`} target="_blank">
+                Export PDF
+              </a>
+            </Button>
+          </div>
         </div>
 
         <Card>
@@ -172,7 +186,7 @@ export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan
                     pelanggaran.map((p) => (
                       <tr key={p.id_catatan} className="border-b align-top hover:bg-muted/5">
                         <td className="p-3">
-                          <div className="font-semibold">{p.tanggal_kejadian}</div>
+                          <div className="font-semibold">{formatDateDMY(p.tanggal_kejadian)}</div>
                           <div className="text-xs text-muted-foreground">M{p.minggu_ke} - {p.bulan} {p.tahun}</div>
                         </td>
                         <td className="p-3 font-bold">{p.anggota?.nama_lengkap}</td>
@@ -233,7 +247,7 @@ export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan
                         <span className="inline-block mt-1 bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] font-bold uppercase">{p.anggota?.regu}</span>
                       </div>
                       <div className="flex flex-col items-end gap-1">
-                        <div className="font-semibold text-xs">{p.tanggal_kejadian}</div>
+                        <div className="font-semibold text-xs">{formatDateDMY(p.tanggal_kejadian)}</div>
                         <div className="text-[10px] text-muted-foreground">M{p.minggu_ke} - {p.bulan} {p.tahun}</div>
                       </div>
                     </div>

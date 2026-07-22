@@ -3,6 +3,7 @@ import { useForm, Head, router } from "@inertiajs/react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Edit, Ban, CheckCircle } from "lucide-react";
 
 interface User {
   id_user: number;
@@ -34,6 +35,9 @@ export default function UserManagement({ users, regus = [] }: Props) {
     regu: "",
     username: "",
     password: "",
+    tempat_lahir: "",
+    tanggal_lahir: "",
+    sisa_cuti: 12,
   });
 
   // Edit User Form
@@ -90,6 +94,20 @@ export default function UserManagement({ users, regus = [] }: Props) {
         resetRegu();
         alert("Regu berhasil ditambahkan!");
       }
+    });
+  };
+
+  const handleQuickReguChange = (user: User, newRegu: string) => {
+    router.put(`/admin/users/${user.id_user}`, {
+      nama_lengkap: user.nama_lengkap,
+      role: user.role,
+      username: user.username,
+      regu: newRegu,
+      tempat_lahir: user.tempat_lahir || "",
+      tanggal_lahir: user.tanggal_lahir || "",
+      sisa_cuti: user.sisa_cuti ?? 12,
+    }, {
+      preserveScroll: true,
     });
   };
 
@@ -185,18 +203,6 @@ export default function UserManagement({ users, regus = [] }: Props) {
                   </div>
                 )}
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-foreground uppercase tracking-wider">Username</label>
-                  <input
-                    type="text"
-                    value={editData.username}
-                    onChange={(e) => setEditData("username", e.target.value)}
-                    className="w-full p-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm font-semibold"
-                    required
-                  />
-                  {editErrors.username && <span className="text-xs text-destructive">{editErrors.username}</span>}
-                </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-bold text-foreground uppercase tracking-wider">Tempat Lahir</label>
@@ -230,6 +236,18 @@ export default function UserManagement({ users, regus = [] }: Props) {
                     className="w-full p-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm font-semibold"
                   />
                   {editErrors.sisa_cuti && <span className="text-xs text-destructive">{editErrors.sisa_cuti}</span>}
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-foreground uppercase tracking-wider">Username</label>
+                  <input
+                    type="text"
+                    value={editData.username}
+                    onChange={(e) => setEditData("username", e.target.value)}
+                    className="w-full p-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm font-semibold"
+                    required
+                  />
+                  {editErrors.username && <span className="text-xs text-destructive">{editErrors.username}</span>}
                 </div>
 
                 <div className="flex flex-col gap-1.5">
@@ -356,6 +374,30 @@ export default function UserManagement({ users, regus = [] }: Props) {
                     </div>
                   )}
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-foreground uppercase tracking-wider">Tempat Lahir</label>
+                      <input
+                        type="text"
+                        value={data.tempat_lahir}
+                        onChange={(e) => setData("tempat_lahir", e.target.value)}
+                        className="w-full p-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm font-semibold"
+                      />
+                      {errors.tempat_lahir && <span className="text-xs text-destructive">{errors.tempat_lahir}</span>}
+                    </div>
+                    
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-foreground uppercase tracking-wider">Tanggal Lahir</label>
+                      <input
+                        type="date"
+                        value={data.tanggal_lahir}
+                        onChange={(e) => setData("tanggal_lahir", e.target.value)}
+                        className="w-full p-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm font-semibold"
+                      />
+                      {errors.tanggal_lahir && <span className="text-xs text-destructive">{errors.tanggal_lahir}</span>}
+                    </div>
+                  </div>
+
                   {/* Username */}
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-bold text-foreground uppercase tracking-wider">Username</label>
@@ -406,8 +448,8 @@ export default function UserManagement({ users, regus = [] }: Props) {
                     <thead>
                       <tr className="border-b bg-muted/50 text-muted-foreground font-bold">
                         <th className="p-3">Nama</th>
-                        <th className="p-3">Username</th>
                         <th className="p-3">Role</th>
+                        <th className="p-3 w-24">Regu</th>
                         <th className="p-3 text-center">Status</th>
                         <th className="p-3 text-center">Aksi</th>
                       </tr>
@@ -420,21 +462,51 @@ export default function UserManagement({ users, regus = [] }: Props) {
                           acc[regu].push(user);
                           return acc;
                         }, {} as Record<string, User[]>)
-                      ).map(([reguName, reguUsers]) => (
-                        <React.Fragment key={reguName}>
-                          <tr className="border-b bg-muted/30">
-                            <td colSpan={5} className="p-3 font-black text-primary uppercase text-[10px] tracking-widest bg-muted/50">
-                              {reguName === "Tanpa Regu" ? "TANPA REGU" : reguName.toUpperCase()}
-                            </td>
-                          </tr>
-                          {reguUsers.map((user) => (
+                      ).map(([reguName, reguUsers]) => {
+                        const sortedReguUsers = [...reguUsers].sort((a, b) => {
+                          if (a.role === 'Danru' && b.role !== 'Danru') return -1;
+                          if (a.role !== 'Danru' && b.role === 'Danru') return 1;
+                          return a.nama_lengkap.localeCompare(b.nama_lengkap);
+                        });
+                        return (
+                          <React.Fragment key={reguName}>
+                            <tr className="border-b bg-muted/30">
+                              <td colSpan={6} className="p-3 font-black text-primary uppercase text-[10px] tracking-widest bg-muted/50">
+                                {reguName === "Tanpa Regu" ? "TANPA REGU" : reguName.toUpperCase()}
+                              </td>
+                            </tr>
+                            {sortedReguUsers.map((user) => (
                             <tr key={user.id_user} className="border-b hover:bg-muted/10">
-                              <td className="p-3 font-semibold text-foreground">{user.nama_lengkap}</td>
-                              <td className="p-3 font-medium">{user.username}</td>
+                              <td className="p-3 font-semibold text-foreground">
+                                <div className="flex items-center gap-2">
+                                  {user.role === 'Danru' && (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-primary text-primary-foreground">
+                                      DANRU
+                                    </span>
+                                  )}
+                                  {user.nama_lengkap}
+                                </div>
+                              </td>
                               <td className="p-3">
                                 <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-muted border">
                                   {user.role}
                                 </span>
+                              </td>
+                              <td className="p-3">
+                                {(user.role === 'Danru' || user.role === 'Anggota') ? (
+                                  <select
+                                    value={user.regu || ""}
+                                    onChange={(e) => handleQuickReguChange(user, e.target.value)}
+                                    className="p-1 text-xs border rounded bg-background font-semibold focus:ring-1 focus:ring-primary w-20 text-center"
+                                  >
+                                    <option value="">-- Pilih Regu --</option>
+                                    {regus.map(r => (
+                                      <option key={r.id_regu} value={r.nama_regu}>{r.nama_regu}</option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">-</span>
+                                )}
                               </td>
                               <td className="p-3 text-center">
                                 {user.status_aktif ? (
@@ -452,23 +524,26 @@ export default function UserManagement({ users, regus = [] }: Props) {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => startEdit(user)}
-                                  className="text-xs px-2 h-7 font-bold"
+                                  className="h-7 w-7 p-0"
+                                  title="Edit"
                                 >
-                                  Edit
+                                  <Edit className="w-4 h-4" />
                                 </Button>
                                 <Button
                                   size="sm"
                                   variant={user.status_aktif ? "destructive" : "outline"}
                                   onClick={() => handleToggleStatus(user.id_user)}
-                                  className="text-xs px-2 h-7 font-bold"
+                                  className="h-7 w-7 p-0"
+                                  title={user.status_aktif ? "Nonaktifkan" : "Aktifkan"}
                                 >
-                                  {user.status_aktif ? "Nonaktifkan" : "Aktifkan"}
+                                  {user.status_aktif ? <Ban className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
                                 </Button>
                               </td>
                             </tr>
                           ))}
                         </React.Fragment>
-                      ))}
+                      );
+                    })}
                     </tbody>
                   </table>
                 </div>
@@ -482,57 +557,87 @@ export default function UserManagement({ users, regus = [] }: Props) {
                       acc[regu].push(user);
                       return acc;
                     }, {} as Record<string, User[]>)
-                  ).map(([reguName, reguUsers]) => (
-                    <div key={reguName} className="flex flex-col gap-3">
-                      <div className="font-black text-primary uppercase text-[10px] tracking-widest bg-muted/50 p-2 rounded">
-                        {reguName === "Tanpa Regu" ? "TANPA REGU" : reguName.toUpperCase()}
-                      </div>
-                      {reguUsers.map((user) => (
-                        <div key={user.id_user} className="flex flex-col gap-2 p-3 border rounded-lg bg-card shadow-xs">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <div className="font-semibold text-foreground text-sm">{user.nama_lengkap}</div>
-                              <div className="text-xs font-medium text-muted-foreground">{user.username}</div>
-                            </div>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-muted border">
-                              {user.role}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center mt-2 pt-2 border-t">
-                            <div>
-                              {user.status_aktif ? (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
-                                  Aktif
-                                </span>
-                              ) : (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-50 text-red-700 border border-red-200">
-                                  Non-aktif
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => startEdit(user)}
-                                className="text-xs px-2 h-7 font-bold"
-                              >
-                                Edit
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant={user.status_aktif ? "destructive" : "outline"}
-                                onClick={() => handleToggleStatus(user.id_user)}
-                                className="text-xs px-2 h-7 font-bold"
-                              >
-                                {user.status_aktif ? "Nonaktifkan" : "Aktifkan"}
-                              </Button>
-                            </div>
-                          </div>
+                  ).map(([reguName, reguUsers]) => {
+                    const sortedReguUsers = [...reguUsers].sort((a, b) => {
+                      if (a.role === 'Danru' && b.role !== 'Danru') return -1;
+                      if (a.role !== 'Danru' && b.role === 'Danru') return 1;
+                      return a.nama_lengkap.localeCompare(b.nama_lengkap);
+                    });
+                    return (
+                      <div key={reguName} className="flex flex-col gap-3">
+                        <div className="font-black text-primary uppercase text-[10px] tracking-widest bg-muted/50 p-2 rounded">
+                          {reguName === "Tanpa Regu" ? "TANPA REGU" : reguName.toUpperCase()}
                         </div>
-                      ))}
-                    </div>
-                  ))}
+                        {sortedReguUsers.map((user) => (
+                          <div key={user.id_user} className="flex flex-col gap-2 p-3 border rounded-lg bg-card shadow-xs">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <div className="font-semibold text-foreground text-sm flex items-center gap-1.5">
+                                  {user.role === 'Danru' && (
+                                    <span className="px-1 py-0.2 rounded text-[9px] font-extrabold bg-primary text-primary-foreground">
+                                      DANRU
+                                    </span>
+                                  )}
+                                  {user.nama_lengkap}
+                                </div>
+                              </div>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-muted border">
+                                {user.role}
+                              </span>
+                            </div>
+                            {(user.role === 'Danru' || user.role === 'Anggota') && (
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-xs font-bold text-muted-foreground">Regu:</span>
+                                <select
+                                  value={user.regu || ""}
+                                  onChange={(e) => handleQuickReguChange(user, e.target.value)}
+                                  className="p-1 text-xs border rounded bg-background font-semibold focus:ring-1 focus:ring-primary flex-1"
+                                >
+                                  <option value="">-- Pilih Regu --</option>
+                                  {regus.map(r => (
+                                    <option key={r.id_regu} value={r.nama_regu}>{r.nama_regu}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+                            <div className="flex justify-between items-center mt-2 pt-2 border-t">
+                              <div>
+                                {user.status_aktif ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
+                                    Aktif
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-50 text-red-700 border border-red-200">
+                                    Non-aktif
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => startEdit(user)}
+                                  className="h-7 w-7 p-0"
+                                  title="Edit"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant={user.status_aktif ? "destructive" : "outline"}
+                                  onClick={() => handleToggleStatus(user.id_user)}
+                                  className="h-7 w-7 p-0"
+                                  title={user.status_aktif ? "Nonaktifkan" : "Aktifkan"}
+                                >
+                                  {user.status_aktif ? <Ban className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>

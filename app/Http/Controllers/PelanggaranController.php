@@ -72,7 +72,7 @@ class PelanggaranController extends Controller
 
         CatatanPelanggaran::create([
             'id_anggota' => $validated['id_anggota'],
-            'id_danru_penilai' => $user->id_user,
+            'id_penilai' => $user->id_user,
             'tanggal_kejadian' => $validated['tanggal_kejadian'],
             'minggu_ke' => $validated['minggu_ke'],
             'bulan' => $validated['bulan'],
@@ -97,10 +97,7 @@ class PelanggaranController extends Controller
         ];
         $defaultBulan = $defaultBulanMap[$now->month];
         $defaultTahun = $now->year;
-        
-        $firstDayOfMonth = $now->copy()->startOfMonth();
-        $offset = $firstDayOfMonth->dayOfWeekIso - 1;
-        $defaultMingguKe = (int) ceil(($now->day + $offset) / 7);
+        $defaultMingguKe = \App\Http\Controllers\LaporanController::getWeekNumberForDate($now);
 
         $bulan = $request->input('bulan', $defaultBulan);
         $tahun = (int)$request->input('tahun', $defaultTahun);
@@ -124,7 +121,7 @@ class PelanggaranController extends Controller
 
         $pelanggaran = $query->orderBy('tanggal_kejadian', 'desc')->get();
 
-        $reguList = User::where('role', 'Danru')->where('status_aktif', 1)->pluck('regu')->filter()->unique()->values();
+        $reguList = \App\Models\Regu::orderBy('nama_regu', 'asc')->pluck('nama_regu')->values();
 
         return Inertia::render('Pelanggaran/DaftarPelanggaran', [
             'pelanggaran' => $pelanggaran,
@@ -154,5 +151,50 @@ class PelanggaranController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Status tindak lanjut berhasil diperbarui!');
+    }
+
+    public function exportPelanggaran(Request $request)
+    {
+        $user = Auth::user();
+        $type = $request->query('type', 'pdf');
+        $bulan = $request->query('bulan', 'Juli');
+        $tahun = (int)$request->query('tahun', 2026);
+        $minggu_ke = (int)$request->query('minggu_ke', 1);
+        $filter_regu = $request->query('filter_regu');
+
+        $query = CatatanPelanggaran::with(['anggota:id_user,nama_lengkap,regu', 'danruPenilai:id_user,nama_lengkap'])
+            ->where('bulan', $bulan)
+            ->where('tahun', $tahun)
+            ->where('minggu_ke', $minggu_ke);
+
+        if (strtolower(trim($user->role)) === 'danru') {
+            $query->whereHas('anggota', function ($q) use ($user) {
+                $q->where('regu', trim($user->regu));
+            });
+        } else if ((strtolower(trim($user->role)) === 'chief' || strtolower(trim($user->role)) === 'admin') && $filter_regu) {
+            $query->whereHas('anggota', function ($q) use ($filter_regu) {
+                $q->where('regu', $filter_regu);
+            });
+        }
+
+        $pelanggaran = $query->orderBy('tanggal_kejadian', 'desc')->get();
+
+        if ($type === 'excel') {
+            return \Maatwebsite\Excel\Facades\Excel::download(
+                new \App\Exports\PelanggaranExport($pelanggaran, $bulan, $tahun, $minggu_ke), 
+                "catatan_pelanggaran_{$minggu_ke}_{$bulan}_{$tahun}.xlsx"
+            );
+        } else if ($type === 'pdf') {
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.daftar_pelanggaran', [
+                'pelanggaran' => $pelanggaran,
+                'bulan' => $bulan,
+                'tahun' => $tahun,
+                'minggu_ke' => $minggu_ke,
+                'filter_regu' => $filter_regu,
+            ])->setPaper('a4', 'landscape');
+            return $pdf->stream("catatan_pelanggaran_{$minggu_ke}_{$bulan}_{$tahun}.pdf");
+        }
+
+        return redirect()->back()->with('error', 'Tipe export tidak valid');
     }
 }

@@ -12,7 +12,7 @@ class CatatanPelanggaran extends Model
 
     protected $fillable = [
         'id_anggota',
-        'id_danru_penilai',
+        'id_penilai',
         'tanggal_kejadian',
         'minggu_ke',
         'bulan',
@@ -30,6 +30,6 @@ class CatatanPelanggaran extends Model
 
     public function danruPenilai(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'id_danru_penilai', 'id_user');
+        return $this->belongsTo(User::class, 'id_penilai', 'id_user');
     }
 }

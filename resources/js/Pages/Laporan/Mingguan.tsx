@@ -36,7 +36,6 @@ interface OfficerPerformance {
   id_user: number;
   nama_lengkap: string;
   regu: string;
-  shift: string;
   scores: Record<string, number>;
   total_score: number;
   percentage: number;
@@ -109,16 +108,8 @@ export default function LaporanMingguan({
     "Juli", "Agustus", "September", "Oktober", "November", "Desember"
   ];
 
-  const getAvailableWeeks = (bulanStr: string, tahun: number) => {
-    const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-    const monthIndex = months.indexOf(bulanStr);
-    if (monthIndex === -1) return [1, 2, 3, 4, 5];
-    const firstDay = new Date(tahun, monthIndex, 1);
-    const lastDay = new Date(tahun, monthIndex + 1, 0);
-    const numDays = lastDay.getDate();
-    const firstDayOfWeek = (firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1);
-    const totalWeeks = Math.ceil((numDays + firstDayOfWeek) / 7);
-    return Array.from({ length: totalWeeks }, (_, i) => i + 1);
+  const getAvailableWeeks = (bulan: string, tahun: number) => {
+    return [1, 2, 3, 4];
   };
 
   const handleFilterChange = (bulan: string, minggu: number, tahun: number, regu?: string | null) => {

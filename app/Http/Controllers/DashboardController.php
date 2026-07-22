@@ -16,7 +16,7 @@ class DashboardController extends Controller
 
         if ($role === 'chief' || $role === 'admin') {
             // Dashboard for Chief/Admin: Show Danrus and their weekly report status for the current month
-            $danrus = User::where('role', 'Danru')->where('status_aktif', 1)->orderBy('nama_lengkap', 'asc')->get();
+            $danrus = User::where('role', 'Danru')->where('status_aktif', 1)->orderBy('regu', 'asc')->orderBy('nama_lengkap', 'asc')->get();
             
             $now = \Carbon\Carbon::now();
             $defaultBulanMap = [
@@ -43,21 +43,15 @@ class DashboardController extends Controller
                 $danruLaporan = $laporan->get($danru->id_user, collect());
                 $mingguanStatus = [];
                 for ($i = 1; $i <= 6; $i++) {
-                    $lastDayOfWeek = ($i * 7) - $firstDayIso + 1;
-                    if ($lastDayOfWeek > $daysInMonth) {
-                        $lastDayOfWeek = $daysInMonth;
-                    }
-                    $endOfWeekDate = clone $firstDayOfMonth;
-                    $endOfWeekDate->day($lastDayOfWeek)->endOfDay();
-                    $isPassed = $now->gt($endOfWeekDate);
-
-                    // Check if it exists for this week
-                    // Available weeks logic from frontend:
-                    $totalWeeks = (int) ceil(($daysInMonth + $firstDayIso - 1) / 7);
+                    $totalWeeks = 4; // Fix to 4 weeks
                     if ($i > $totalWeeks) {
                         $mingguanStatus["minggu_$i"] = 'Not_Available';
                         continue;
                     }
+
+                    $startOfWeek1 = \App\Http\Controllers\LaporanController::getStartOfWeek1($currentTahun, $bulanNum);
+                    $endOfWeekDate = $startOfWeek1->copy()->addDays(($i - 1) * 7 + 6)->endOfDay();
+                    $isPassed = $now->gt($endOfWeekDate);
 
                     $lap = $danruLaporan->firstWhere('minggu_ke', $i);
                     $statusDokumen = $lap ? $lap->status_dokumen : 'Draft';
@@ -153,7 +147,7 @@ class DashboardController extends Controller
                 }
             }
 
-            // --- Calculate 3-Month Trend (Siang & Malam) for the Regu ---
+            // --- Calculate 3-Month Trend (Pagi & Malam) for the Regu ---
             $now = \Carbon\Carbon::now();
             $defaultBulanMap = [
                 1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
@@ -161,7 +155,7 @@ class DashboardController extends Controller
                 9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
             ];
 
-            $trendSiang = [];
+            $trendPagi = [];
             $trendMalam = [];
 
             $anggotaNames = $anggota->pluck('nama_lengkap', 'id_user')->toArray();
@@ -174,15 +168,10 @@ class DashboardController extends Controller
                     $tBulanStr = $defaultBulanMap[$tMonth];
                     $shortBulan = substr($tBulanStr, 0, 3);
                     
-                    $monthDataSiang = ['name' => $shortBulan];
+                    $monthDataPagi = ['name' => $shortBulan];
                     $monthDataMalam = ['name' => $shortBulan];
                     
-                    // Initialize 100 for everyone
-                    foreach ($anggotaNames as $id => $name) {
-                        $monthDataSiang[$name] = 100;
-                        $monthDataMalam[$name] = 100;
-                    }
-
+                    // Query violations and schedules for this month
                     $violationsThisMonth = \App\Models\CatatanPelanggaran::whereIn('id_anggota', $anggotaIds)
                         ->where('bulan', $tBulanStr)
                         ->where('tahun', $tYear)
@@ -193,32 +182,63 @@ class DashboardController extends Controller
                         ->where('tahun', $tYear)
                         ->get()->keyBy('id_anggota');
 
+                    // Process shift schedules & deductions per person
+                    $pagiDeduction = [];
+                    $malamDeduction = [];
+                    $hasPagiShift = [];
+                    $hasMalamShift = [];
+
+                    foreach ($anggotaNames as $id => $name) {
+                        $pagiDeduction[$id] = 0;
+                        $malamDeduction[$id] = 0;
+                        $hasPagiShift[$id] = false;
+                        $hasMalamShift[$id] = false;
+
+                        if (isset($jadwalsThatMonth[$id]) && is_array($jadwalsThatMonth[$id]->jadwal_harian)) {
+                            foreach ($jadwalsThatMonth[$id]->jadwal_harian as $d => $sStr) {
+                                $lower = strtolower((string)$sStr);
+                                if (strpos($lower, 'pagi') !== false || strpos($lower, 'siang') !== false) {
+                                    $hasPagiShift[$id] = true;
+                                } elseif (strpos($lower, 'malam') !== false) {
+                                    $hasMalamShift[$id] = true;
+                                }
+                            }
+                        }
+                    }
+
                     foreach ($violationsThisMonth as $v) {
                         $deduction = 5;
                         if ($v->tingkat_pelanggaran === 'Sedang') $deduction = 10;
                         if ($v->tingkat_pelanggaran === 'Berat') $deduction = 25;
                         
-                        $shift = 'Siang';
-                        if (isset($jadwalsThatMonth[$v->id_anggota])) {
-                            $jadwal = $jadwalsThatMonth[$v->id_anggota];
-                            $day = \Carbon\Carbon::parse($v->tanggal_kejadian)->format('j');
-                            $dailyShift = $jadwal->jadwal_harian[$day] ?? 'Libur';
-                            if (strpos(strtolower($dailyShift), 'malam') !== false) {
-                                $shift = 'Malam';
-                            } else if (strpos(strtolower($dailyShift), 'pagi') !== false || strpos(strtolower($dailyShift), 'siang') !== false) {
-                                $shift = 'Siang';
+                        $idAcc = $v->id_anggota;
+                        if (isset($anggotaNames[$idAcc])) {
+                            $shift = 'Libur';
+                            if (isset($jadwalsThatMonth[$idAcc]) && is_array($jadwalsThatMonth[$idAcc]->jadwal_harian)) {
+                                $day = \Carbon\Carbon::parse($v->tanggal_kejadian)->format('j');
+                                $dailyShift = $jadwalsThatMonth[$idAcc]->jadwal_harian[$day] ?? 'Libur';
+                                $lowerD = strtolower((string)$dailyShift);
+                                if (strpos($lowerD, 'malam') !== false) {
+                                    $shift = 'Malam';
+                                } elseif (strpos($lowerD, 'pagi') !== false || strpos($lowerD, 'siang') !== false) {
+                                    $shift = 'Pagi';
+                                }
+                            }
+
+                            if ($shift === 'Malam') {
+                                $malamDeduction[$idAcc] += $deduction;
+                            } elseif ($shift === 'Pagi') {
+                                $pagiDeduction[$idAcc] += $deduction;
                             }
                         }
-                        
-                        $name = $anggotaNames[$v->id_anggota];
-                        if ($shift === 'Malam') {
-                            $monthDataMalam[$name] = max(0, $monthDataMalam[$name] - $deduction);
-                        } else {
-                            $monthDataSiang[$name] = max(0, $monthDataSiang[$name] - $deduction);
-                        }
+                    }
+
+                    foreach ($anggotaNames as $id => $name) {
+                        $monthDataPagi[$name] = $hasPagiShift[$id] ? max(0, 100 - $pagiDeduction[$id]) : 0;
+                        $monthDataMalam[$name] = $hasMalamShift[$id] ? max(0, 100 - $malamDeduction[$id]) : 0;
                     }
                     
-                    $trendSiang[] = $monthDataSiang;
+                    $trendPagi[] = $monthDataPagi;
                     $trendMalam[] = $monthDataMalam;
                 }
             }
@@ -233,7 +253,7 @@ class DashboardController extends Controller
                 'weekDates' => $weekDates,
                 'jadwalMingguan' => $jadwalData,
                 'currentStartDate' => $startOfWeek->format('Y-m-d'),
-                'trendSiang' => $trendSiang,
+                'trendPagi' => $trendPagi,
                 'trendMalam' => $trendMalam,
             ]);
         }

@@ -13,14 +13,15 @@ class LaporanMingguan extends Model
     protected $fillable = [
         'id_danru',
         'regu',
-        'shift_berjalan',
         'minggu_ke',
         'bulan',
         'tahun',
         'file_pdf_url',
         'status_dokumen',
         'ttd_danru_url',
+        'tgl_ttd_danru',
         'ttd_chief_url',
+        'tgl_ttd_chief',
     ];
 
     public function danru(): BelongsTo

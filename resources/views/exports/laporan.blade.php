@@ -32,7 +32,6 @@
     @php
         $bulanList = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
         $reguName = collect($performanceData)->pluck('regu')->unique()->filter()->implode(', ') ?: '-';
-        $shiftName = count($performanceData) > 0 ? $performanceData[0]['shift'] : '-';
         $danruName = isset($laporanMingguan) && $laporanMingguan->danru ? $laporanMingguan->danru->nama_lengkap : '';
         $dateObj = isset($laporanMingguan) ? \Carbon\Carbon::parse($laporanMingguan->created_at) : \Carbon\Carbon::now();
         $tanggalRekap = $dateObj->format('d') . ' ' . $bulanList[$dateObj->format('n') - 1] . ' ' . $dateObj->format('Y');
@@ -51,8 +50,8 @@
             <td style="width: 35%;">: {{ strtoupper($danruName) }} (DANRU)</td>
         </tr>
         <tr>
-            <td style="font-weight: bold;">REGU & SHIFT</td>
-            <td>: {{ strtoupper($reguName) }} / {{ strtoupper($shiftName) }}</td>
+            <td style="font-weight: bold;">REGU</td>
+            <td>: {{ strtoupper($reguName) }}</td>
             <td style="font-weight: bold;">DIKETAHUI OLEH</td>
             <td>: CHIEF SECURITY</td>
         </tr>
@@ -145,7 +144,7 @@
                         <span class="signature-line"></span>
                         <div class="signature-name">DANRU</div>
                     @endif
-                    <div style="margin-top: 5px; font-size: 9px; color: #555;">TANGGAL: {{ $tanggalRekap }}</div>
+                    <div style="margin-top: 5px; font-size: 9px; color: #555;">TANGGAL: {{ (isset($laporanMingguan) && $laporanMingguan->tgl_ttd_danru) ? \Carbon\Carbon::parse($laporanMingguan->tgl_ttd_danru)->translatedFormat('d F Y') : ((isset($laporanMingguan) && $laporanMingguan->ttd_danru_url) ? $tanggalRekap : '_________________') }}</div>
                 </td>
                 <td>
                     <div class="font-bold">MENGETAHUI,<br>CHIEF SECURITY</div>
@@ -156,7 +155,7 @@
                         <span class="signature-line"></span>
                         <div class="signature-name">CHIEF SECURITY</div>
                     @endif
-                    <div style="margin-top: 5px; font-size: 9px; color: #555;">TANGGAL: _________________</div>
+                    <div style="margin-top: 5px; font-size: 9px; color: #555;">TANGGAL: {{ (isset($laporanMingguan) && $laporanMingguan->tgl_ttd_chief) ? \Carbon\Carbon::parse($laporanMingguan->tgl_ttd_chief)->translatedFormat('d F Y') : ((isset($laporanMingguan) && $laporanMingguan->ttd_chief_url) ? $tanggalRekap : '_________________') }}</div>
                 </td>
             </tr>
         </table>

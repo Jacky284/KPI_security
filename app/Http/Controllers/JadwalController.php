@@ -16,20 +16,20 @@ class JadwalController extends Controller
     public function manage(Request $request)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['Admin', 'Danru', 'Chief'])) {
+        if (!in_array($user->role, ['Admin', 'Chief'])) {
             abort(403);
         }
 
         $bulan = $request->query('bulan', Carbon::now()->format('m'));
         $tahun = $request->query('tahun', Carbon::now()->format('Y'));
 
-        // Danru hanya bisa melihat anggota dari regunya
-        $query = User::where('role', 'Anggota');
-        if (strtolower(trim($user->role)) === 'danru') {
-            $query->where('regu', trim($user->regu));
-        }
+        // Ambil semua anggota dan danru, urutkan berdasarkan regu, lalu role (Danru lebih dulu), lalu nama
+        $anggotas = User::whereIn('role', ['Anggota', 'Danru'])
+            ->orderBy('regu')
+            ->orderBy('role', 'desc')
+            ->orderBy('nama_lengkap')
+            ->get();
         
-        $anggotas = $query->get();
         $jadwals = JadwalBulanan::where('bulan', $bulan)
             ->where('tahun', $tahun)
             ->whereIn('id_anggota', $anggotas->pluck('id_user'))
@@ -47,7 +47,7 @@ class JadwalController extends Controller
     public function store(Request $request)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['Admin', 'Danru', 'Chief'])) {
+        if (!in_array($user->role, ['Admin', 'Chief'])) {
             abort(403);
         }
 
@@ -56,17 +56,6 @@ class JadwalController extends Controller
             'tahun' => 'required|integer',
             'jadwal' => 'required|array', // key is id_anggota, value is array of "day": "shift"
         ]);
-
-        if (strtolower(trim($user->role)) === 'danru') {
-            $anggotaIds = array_keys($validated['jadwal']);
-            $validCount = User::whereIn('id_user', $anggotaIds)
-                              ->where('role', 'Anggota')
-                              ->where('regu', trim($user->regu))
-                              ->count();
-            if ($validCount !== count($anggotaIds)) {
-                abort(403, 'Akses ditolak. Anda mencoba menyimpan jadwal untuk anggota di luar regu Anda.');
-            }
-        }
 
         foreach ($validated['jadwal'] as $id_anggota => $jadwal_harian) {
             JadwalBulanan::updateOrCreate(

@@ -47,7 +47,7 @@ interface Props {
 }
 
 export default function Detail({ anggota, riwayatPelanggaran, jadwalBulanIni, trendData, indicatorTrendData }: Props) {
-  
+
   // Format Tanggal Lahir
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "-";
@@ -65,9 +65,9 @@ export default function Detail({ anggota, riwayatPelanggaran, jadwalBulanIni, tr
   return (
     <>
       <Head title={`Profil - ${anggota.nama_lengkap}`} />
-      
+
       <div className="flex flex-col gap-6 max-w-7xl mx-auto">
-        
+
         {/* Header Navigation */}
         <div className="flex items-center gap-4">
           <Link href="/anggota">
@@ -82,7 +82,7 @@ export default function Detail({ anggota, riwayatPelanggaran, jadwalBulanIni, tr
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
+
           {/* Left Column: Biodata */}
           <div className="flex flex-col gap-6">
             <Card className="shadow-sm border-2 overflow-hidden">
@@ -94,10 +94,10 @@ export default function Detail({ anggota, riwayatPelanggaran, jadwalBulanIni, tr
                     {anggota.nama_lengkap.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                
+
                 <h2 className="text-xl font-bold">{anggota.nama_lengkap}</h2>
                 <Badge variant="secondary" className="mt-1 font-semibold">{anggota.regu || "Tanpa Regu"}</Badge>
-                
+
                 <div className="w-full mt-6 space-y-3 text-left">
                   <div className="flex items-center gap-3 text-sm">
                     <MapPin className="h-4 w-4 text-muted-foreground" />
@@ -109,7 +109,7 @@ export default function Detail({ anggota, riwayatPelanggaran, jadwalBulanIni, tr
                   </div>
                   <div className="flex items-center gap-3 text-sm">
                     <Briefcase className="h-4 w-4 text-muted-foreground" />
-                    <span><strong className="font-semibold text-foreground">Jatah Cuti:</strong> 
+                    <span><strong className="font-semibold text-foreground">Jatah Cuti:</strong>
                       <Badge className={`ml-2 hover:bg-transparent ${getCutiColor(anggota.sisa_cuti)}`} variant="outline">
                         {anggota.sisa_cuti} Hari Tersisa
                       </Badge>
@@ -129,12 +129,12 @@ export default function Detail({ anggota, riwayatPelanggaran, jadwalBulanIni, tr
 
           {/* Right Column: Graphs & Data */}
           <div className="lg:col-span-2 flex flex-col gap-6">
-            
+
             {/* Chart */}
             <Card className="shadow-sm">
               <CardHeader>
                 <CardTitle>Tren Kinerja (3 Bulan Terakhir)</CardTitle>
-                <CardDescription>Perbandingan skor kedisiplinan antara Shift Siang dan Shift Malam. Skor dasar 100.</CardDescription>
+                <CardDescription>Perbandingan skor kedisiplinan antara Shift Pagi dan Shift Malam. Skor dasar 100.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-[300px] w-full">
@@ -143,27 +143,47 @@ export default function Detail({ anggota, riwayatPelanggaran, jadwalBulanIni, tr
                       <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
                       <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={10} />
                       <YAxis domain={[0, 100]} tickLine={false} axisLine={false} tickMargin={10} />
-                      <RechartsTooltip 
+                      <RechartsTooltip
                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                       />
-                      <Legend verticalAlign="top" height={36}/>
-                      <Line 
-                        type="monotone" 
-                        name="Shift Pagi/Siang"
-                        dataKey="Siang" 
-                        stroke="#f59e0b" // Amber/Yellow for Day
+                      <Legend
+                        verticalAlign="top"
+                        content={() => (
+                          <div className="flex justify-center items-center gap-6 text-xs pb-4">
+                            <div className="flex items-center gap-2">
+                              <svg className="w-5 h-2.5" viewBox="0 0 24 10">
+                                <line x1="0" y1="5" x2="24" y2="5" stroke="#0ea5e9" strokeWidth="2.5" />
+                                <circle cx="12" cy="5" r="3" fill="#ffffff" stroke="#0ea5e9" strokeWidth="2" />
+                              </svg>
+                              <span className="font-medium text-foreground">Shift Pagi</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <svg className="w-5 h-2.5" viewBox="0 0 24 10">
+                                <line x1="0" y1="5" x2="24" y2="5" stroke="#6366f1" strokeWidth="2.5" />
+                                <circle cx="12" cy="5" r="3.5" fill="#ffffff" stroke="#6366f1" strokeWidth="2" />
+                              </svg>
+                              <span className="font-medium text-foreground">Shift Malam</span>
+                            </div>
+                          </div>
+                        )}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="Pagi"
+                        name="Shift Pagi"
+                        stroke="#0ea5e9" // Sky blue for Morning
                         strokeWidth={3}
                         dot={{ r: 4, strokeWidth: 2 }}
                         activeDot={{ r: 6 }}
                       />
-                      <Line 
+                      <Line
                         type="monotone"
-                        name="Shift Malam" 
-                        dataKey="Malam" 
+                        dataKey="Malam"
+                        name="Shift Malam"
                         stroke="#6366f1" // Indigo/Blue for Night
                         strokeWidth={3}
                         dot={{ r: 4, strokeWidth: 2 }}
-                        activeDot={{ r: 8 }} 
+                        activeDot={{ r: 8 }}
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -185,13 +205,27 @@ export default function Detail({ anggota, riwayatPelanggaran, jadwalBulanIni, tr
                         <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
                         <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={10} tick={{ fontSize: 12 }} />
                         <YAxis domain={[0, 100]} tickLine={false} axisLine={false} tickMargin={10} tick={{ fontSize: 12 }} />
-                        <RechartsTooltip 
+                        <RechartsTooltip
                           cursor={{ fill: 'rgba(0,0,0,0.05)' }}
                           contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                         />
-                        <Legend verticalAlign="top" height={36}/>
-                        <Bar dataKey="Siang" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="Malam" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                        <Legend
+                          verticalAlign="top"
+                          content={() => (
+                            <div className="flex justify-center items-center gap-6 text-xs pb-4">
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-3 h-3 bg-[#0ea5e9] rounded-xs inline-block"></span>
+                                <span className="font-medium text-foreground">Shift Pagi</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-3 h-3 bg-[#8b5cf6] rounded-xs inline-block"></span>
+                                <span className="font-medium text-foreground">Shift Malam</span>
+                              </div>
+                            </div>
+                          )}
+                        />
+                        <Bar dataKey="Pagi" name="Shift Pagi" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="Malam" name="Shift Malam" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>

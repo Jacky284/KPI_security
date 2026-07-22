@@ -14,7 +14,9 @@ return new class extends Migration
         Schema::table('laporan_mingguan', function (Blueprint $table) {
             $table->enum('status_dokumen', ['Draft', 'Review_Chief', 'Approved'])->default('Draft')->after('tahun');
             $table->text('ttd_danru_url')->nullable()->after('status_dokumen');
-            $table->text('ttd_chief_url')->nullable()->after('ttd_danru_url');
+            $table->timestamp('tgl_ttd_danru')->nullable()->after('ttd_danru_url');
+            $table->text('ttd_chief_url')->nullable()->after('tgl_ttd_danru');
+            $table->timestamp('tgl_ttd_chief')->nullable()->after('ttd_chief_url');
         });
     }
 

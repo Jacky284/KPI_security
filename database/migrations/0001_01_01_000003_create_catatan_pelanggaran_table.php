@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('catatan_pelanggaran', function (Blueprint $table) {
             $table->id('id_catatan');
             $table->unsignedBigInteger('id_anggota');
-            $table->unsignedBigInteger('id_danru_penilai');
+            $table->unsignedBigInteger('id_penilai');
             $table->date('tanggal_kejadian');
             $table->integer('minggu_ke');
             $table->string('bulan', 20);
@@ -25,7 +25,7 @@ return new class extends Migration
             
             // Constraints
             $table->foreign('id_anggota')->references('id_user')->on('users')->onDelete('cascade');
-            $table->foreign('id_danru_penilai')->references('id_user')->on('users')->onDelete('cascade');
+            $table->foreign('id_penilai')->references('id_user')->on('users')->onDelete('cascade');
             
             $table->timestamps();
         });

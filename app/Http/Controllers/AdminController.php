@@ -12,8 +12,8 @@ class AdminController extends Controller
 {
     private function checkAdmin()
     {
-        if (Auth::user()?->role !== 'Admin') {
-            abort(403, 'Akses ditolak. Hanya administrator yang dapat mengakses halaman ini.');
+        if (!in_array(Auth::user()?->role, ['Admin', 'Chief'])) {
+            abort(403, 'Akses ditolak. Hanya administrator dan chief yang dapat mengakses halaman ini.');
         }
     }
 
@@ -21,7 +21,10 @@ class AdminController extends Controller
     {
         $this->checkAdmin();
 
-        $users = User::orderBy('created_at', 'desc')->get();
+        $users = User::orderBy('regu', 'asc')
+            ->orderByRaw("CASE WHEN role = 'Danru' THEN 1 WHEN role = 'Anggota' THEN 2 ELSE 3 END")
+            ->orderBy('nama_lengkap', 'asc')
+            ->get();
         $regus = \App\Models\Regu::orderBy('nama_regu', 'asc')->get();
         
         return Inertia::render('Admin/UserManagement', [

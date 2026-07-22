@@ -3,7 +3,7 @@
     lang="en"
     data-theme-mode="{{ request()->cookie('theme_mode', 'light') }}"
     data-theme-preset="{{ request()->cookie('theme_preset', 'security') }}"
-    data-sidebar-variant="{{ request()->cookie('sidebar_variant', 'floating') }}"
+    data-sidebar-variant="{{ request()->cookie('sidebar_variant', 'inset') }}"
     data-sidebar-collapsible="{{ request()->cookie('sidebar_collapsible', 'icon') }}"
     data-font="{{ request()->cookie('font', 'geist') }}"
 >

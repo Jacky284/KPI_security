@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id('id_laporan_mingguan');
             $table->unsignedBigInteger('id_danru');
             $table->string('regu', 50);
-            $table->string('shift_berjalan', 20);
             $table->integer('minggu_ke');
             $table->string('bulan', 20);
             $table->integer('tahun');

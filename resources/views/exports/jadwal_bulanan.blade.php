@@ -76,9 +76,9 @@
                         @for ($i = 1; $i <= 15; $i++)
                             <td class="text-center">
                                 @if(isset($harian[$i]))
-                                    @if($harian[$i] == 'Pagi') P @elseif($harian[$i] == 'Malam') M @else L @endif
+                                    @if($harian[$i] == 'Pagi') P @elseif($harian[$i] == 'Malam') M @else - @endif
                                 @else
-                                    L
+                                    -
                                 @endif
                             </td>
                         @endfor
@@ -115,9 +115,9 @@
                         @for ($i = 16; $i <= $daysInMonth; $i++)
                             <td class="text-center">
                                 @if(isset($harian[$i]))
-                                    @if($harian[$i] == 'Pagi') P @elseif($harian[$i] == 'Malam') M @else L @endif
+                                    @if($harian[$i] == 'Pagi') P @elseif($harian[$i] == 'Malam') M @else - @endif
                                 @else
-                                    L
+                                    -
                                 @endif
                             </td>
                         @endfor
@@ -134,7 +134,7 @@
     </div>
 
     <div class="footer">
-        <p>Keterangan: P = Pagi, M = Malam, L = Libur</p>
+        <p>Keterangan: P = Pagi, M = Malam, - = Libur</p>
         <p>Dokumen ini dicetak secara otomatis oleh sistem.<br>
         Dicetak oleh: <strong>{{ auth()->check() ? auth()->user()->nama_lengkap : 'Sistem' }}</strong></p>
     </div>

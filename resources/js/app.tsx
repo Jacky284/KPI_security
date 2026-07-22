@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 import './bootstrap';
 import '../css/app.css';
 
@@ -11,11 +13,16 @@ import { Toaster } from '@/components/ui/sonner';
 import { PREFERENCE_DEFAULTS } from '@/lib/preferences/preferences-config';
 import { PreferencesStoreProvider } from '@/stores/preferences/preferences-provider';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Studio Admin';
+const appName = import.meta.env.VITE_APP_NAME || 'KPI Security';
+const pages = import.meta.glob('./Pages/**/*.tsx') as Record<string, () => Promise<{ default: React.ComponentType<any> }>>;
 
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
-    resolve: (name) => resolvePageComponent(`./Pages/${name}.tsx`, import.meta.glob('./Pages/**/*.tsx')),
+    resolve: async (name) => {
+        const page = await resolvePageComponent(`./Pages/${name}.tsx`, pages);
+
+        return page.default;
+    },
     setup({ el, App, props }) {
         const root = createRoot(el);
         root.render(

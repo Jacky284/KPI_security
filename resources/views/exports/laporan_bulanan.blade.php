@@ -38,6 +38,11 @@
         $chiefName = "CHIEF SECURITY";
         $danruName = isset($laporanBulananObj) && $laporanBulananObj->danruPembuat ? $laporanBulananObj->danruPembuat->nama_lengkap : 'DANRU';
         $bulanText = isset($bulan) ? $bulan : $bulanList[date('n')-1];
+        $reguName = isset($laporanBulananObj) && $laporanBulananObj->regu 
+            ? $laporanBulananObj->regu 
+            : (isset($detailedMonthlyData['perPerson']) && count($detailedMonthlyData['perPerson']) > 0 
+                ? (collect($detailedMonthlyData['perPerson'])->pluck('regu')->unique()->filter()->implode(', ') ?: 'SEMUA REGU')
+                : 'SEMUA REGU');
     @endphp
 
     <div>
@@ -53,8 +58,8 @@
             <td style="width: 35%;">: {{ strtoupper($danruName) }} (DANRU)</td>
         </tr>
         <tr>
-            <td style="font-weight: bold;">TANGGAL REKAP</td>
-            <td>: {{ strtoupper($tanggalRekap) }}</td>
+            <td style="font-weight: bold;">REGU</td>
+            <td>: {{ strtoupper($reguName) }}</td>
             <td style="font-weight: bold;">DIKETAHUI OLEH</td>
             <td>: CHIEF & PENGGUNA JASA</td>
         </tr>
@@ -136,7 +141,7 @@
                             <td>{{ $idx + 1 }}</td>
                             <td class="text-left font-bold">{{ strtoupper($ind['indikator']) }}</td>
                             <td class="font-bold">{{ number_format($ind['achieved_percentage'], 1) }}%</td>
-                            <td>&ge; {{ $ind['target'] }}%</td>
+                            <td>&gt;= {{ $ind['target'] }}%</td>
                             <td style="color: {{ $ind['keterangan'] == 'Tercapai' ? 'green' : 'red' }}; font-weight: bold;">
                                 {{ $ind['keterangan'] }}
                             </td>
@@ -154,7 +159,7 @@
                     <tr>
                         <td style="border: none; width: 40%; color: green; text-align: right;">Tercapai</td>
                         <td style="border: none; width: 10%; text-align: center;">:</td>
-                        <td style="border: none; width: 50%; text-align: left;">Nilai &ge; Target</td>
+                        <td style="border: none; width: 50%; text-align: left;">Nilai &gt;= Target</td>
                     </tr>
                     <tr>
                         <td style="border: none; color: red; text-align: right;">Tidak Tercapai</td>
@@ -189,7 +194,7 @@
                         <span class="signature-line"></span>
                         <div class="signature-name">DANRU</div>
                     @endif
-                    <div style="margin-top: 5px; font-size: 9px; color: #555;">TANGGAL: {{ $tanggalRekap }}</div>
+                    <div style="margin-top: 5px; font-size: 9px; color: #555;">TANGGAL: {{ (isset($laporanBulananObj) && $laporanBulananObj->tgl_ttd_danru) ? \Carbon\Carbon::parse($laporanBulananObj->tgl_ttd_danru)->translatedFormat('d F Y') : ((isset($laporanBulananObj) && $laporanBulananObj->ttd_danru_url) ? $tanggalRekap : '_________________') }}</div>
                 </td>
                 <!-- Chief -->
                 <td>
@@ -201,7 +206,7 @@
                         <span class="signature-line"></span>
                         <div class="signature-name">CHIEF SECURITY</div>
                     @endif
-                    <div style="margin-top: 5px; font-size: 9px; color: #555;">TANGGAL: _________________</div>
+                    <div style="margin-top: 5px; font-size: 9px; color: #555;">TANGGAL: {{ (isset($laporanBulananObj) && $laporanBulananObj->tgl_ttd_chief) ? \Carbon\Carbon::parse($laporanBulananObj->tgl_ttd_chief)->translatedFormat('d F Y') : ((isset($laporanBulananObj) && $laporanBulananObj->ttd_chief_url) ? $tanggalRekap : '_________________') }}</div>
                 </td>
                 <!-- Pengguna Jasa -->
                 <td>
@@ -213,7 +218,7 @@
                         <span class="signature-line"></span>
                         <div class="signature-name">PENGGUNA JASA</div>
                     @endif
-                    <div style="margin-top: 5px; font-size: 9px; color: #555;">TANGGAL: _________________</div>
+                    <div style="margin-top: 5px; font-size: 9px; color: #555;">TANGGAL: {{ (isset($laporanBulananObj) && $laporanBulananObj->tgl_ttd_klien) ? \Carbon\Carbon::parse($laporanBulananObj->tgl_ttd_klien)->translatedFormat('d F Y') : ((isset($laporanBulananObj) && $laporanBulananObj->ttd_klien_url) ? $tanggalRekap : '_________________') }}</div>
                 </td>
             </tr>
         </table>

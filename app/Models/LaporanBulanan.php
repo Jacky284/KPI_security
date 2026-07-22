@@ -17,8 +17,11 @@ class LaporanBulanan extends Model
         'tahun',
         'status_dokumen',
         'ttd_danru_url',
+        'tgl_ttd_danru',
         'ttd_chief_url',
+        'tgl_ttd_chief',
         'ttd_klien_url',
+        'tgl_ttd_klien',
         'file_pdf_url',
     ];
 

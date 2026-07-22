@@ -145,9 +145,6 @@ export function LayoutControls() {
                 <ToggleGroupItem value="inset" aria-label="Toggle inset">
                   Inset
                 </ToggleGroupItem>
-                <ToggleGroupItem value="sidebar" aria-label="Toggle sidebar">
-                  Sidebar
-                </ToggleGroupItem>
                 <ToggleGroupItem value="floating" aria-label="Toggle floating">
                   Floating
                 </ToggleGroupItem>

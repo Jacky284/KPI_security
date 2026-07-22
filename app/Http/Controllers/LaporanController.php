@@ -171,40 +171,62 @@ class LaporanController extends Controller
         }
         
         $anggotaList = $anggotaQuery->get();
+        $bulanNum = str_pad($this->parseBulanToNumber($bulan), 2, '0', STR_PAD_LEFT);
+        
+        $startOfWeek1 = self::getStartOfWeek1($tahun, $bulanNum);
+        $currentWeekStart = $startOfWeek1->copy()->addDays(($minggu_ke - 1) * 7);
+        $currentWeekEnd = $currentWeekStart->copy()->addDays(6);
+
+        // Fetch Jadwal for current month
         $jadwals = JadwalBulanan::whereIn('id_anggota', $anggotaList->pluck('id_user'))
-            ->where('bulan', str_pad($this->parseBulanToNumber($bulan), 2, '0', STR_PAD_LEFT))
+            ->where('bulan', $bulanNum)
             ->where('tahun', $tahun)
             ->get()->keyBy('id_anggota');
 
+        // Check if we need previous month schedules
+        $jadwalsPrevMonth = null;
+        if ($currentWeekStart->month != (int)$bulanNum) {
+            $prevMonthNum = str_pad($currentWeekStart->month, 2, '0', STR_PAD_LEFT);
+            $jadwalsPrevMonth = JadwalBulanan::whereIn('id_anggota', $anggotaList->pluck('id_user'))
+                ->where('bulan', $prevMonthNum)
+                ->where('tahun', $currentWeekStart->year)
+                ->get()->keyBy('id_anggota');
+        }
+
+        // Check if we need next month schedules
+        $jadwalsNextMonth = null;
+        if ($currentWeekEnd->month != (int)$bulanNum) {
+            $nextMonthNum = str_pad($currentWeekEnd->month, 2, '0', STR_PAD_LEFT);
+            $jadwalsNextMonth = JadwalBulanan::whereIn('id_anggota', $anggotaList->pluck('id_user'))
+                ->where('bulan', $nextMonthNum)
+                ->where('tahun', $currentWeekEnd->year)
+                ->get()->keyBy('id_anggota');
+        }
+
         $performanceData = [];
-
         $indicators = ['Kedisiplinan', 'Kehadiran', 'Kerapihan', 'Komunikasi'];
-
         $now = \Carbon\Carbon::now();
-        $bulanNum = str_pad($this->parseBulanToNumber($bulan), 2, '0', STR_PAD_LEFT);
-        $firstDayOfMonth = \Carbon\Carbon::createFromDate($tahun, $bulanNum, 1);
-        $firstDayIso = $firstDayOfMonth->dayOfWeekIso;
-        $daysInMonth = $firstDayOfMonth->daysInMonth;
-
-        $startDayOfWeek = ($minggu_ke - 1) * 7 - $firstDayIso + 2;
-        $endDayOfWeek = $minggu_ke * 7 - $firstDayIso + 1;
-        
-        $startDayOfWeek = max(1, $startDayOfWeek);
-        $endDayOfWeek = min($daysInMonth, $endDayOfWeek);
 
         foreach ($anggotaList as $officer) {
-            $jadwalHarian = isset($jadwals[$officer->id_user]) ? $jadwals[$officer->id_user]->jadwal_harian : [];
-            
             $passedWorkingDays = 0;
             $hasSchedule = false;
-            for ($d = $startDayOfWeek; $d <= $endDayOfWeek; $d++) {
-                $shiftDay = isset($jadwalHarian[$d]) ? $jadwalHarian[$d] : null;
+
+            for ($date = $currentWeekStart->copy(); $date->lte($currentWeekEnd); $date->addDay()) {
+                $d = $date->day;
+                $shiftDay = null;
+
+                if ($date->month == (int)$bulanNum) {
+                    $shiftDay = isset($jadwals[$officer->id_user]) ? ($jadwals[$officer->id_user]->jadwal_harian[$d] ?? null) : null;
+                } elseif ($jadwalsPrevMonth && $date->month == $currentWeekStart->month) {
+                    $shiftDay = isset($jadwalsPrevMonth[$officer->id_user]) ? ($jadwalsPrevMonth[$officer->id_user]->jadwal_harian[$d] ?? null) : null;
+                } elseif ($jadwalsNextMonth && $date->month == $currentWeekEnd->month) {
+                    $shiftDay = isset($jadwalsNextMonth[$officer->id_user]) ? ($jadwalsNextMonth[$officer->id_user]->jadwal_harian[$d] ?? null) : null;
+                }
+
                 if ($shiftDay) {
                     $hasSchedule = true;
                     if ($shiftDay !== 'Libur') {
-                        $dateOfD = clone $firstDayOfMonth;
-                        $dateOfD->day($d)->startOfDay();
-                        if ($now->gte($dateOfD)) {
+                        if ($now->gte($date->copy()->startOfDay())) {
                             $passedWorkingDays++;
                         }
                     }
@@ -245,17 +267,10 @@ class LaporanController extends Controller
                 $percentage = ($totalScore / 20) * 100;
             }
 
-            $shiftName = 'Pagi';
-            if (count($jadwalHarian) > 0) {
-                $shiftName = current($jadwalHarian) ?: 'Pagi';
-            }
-            $shift = $shiftName == 'Malam' ? 'Shift Malam' : ($shiftName == 'Libur' ? 'Libur' : 'Shift Pagi');
-
             $officerData = [
                 'id_user' => $officer->id_user,
                 'nama_lengkap' => $officer->nama_lengkap,
                 'regu' => $officer->regu,
-                'shift' => $shift,
                 'scores' => $scores,
                 'total_score' => $totalScore,
                 'percentage' => $percentage,
@@ -278,6 +293,20 @@ class LaporanController extends Controller
         return $bulanMap[strtolower($bulanStr)] ?? 1;
     }
 
+    public static function getStartOfWeek1($tahun, $bulanNum)
+    {
+        $firstDayOfMonth = \Carbon\Carbon::createFromDate($tahun, $bulanNum, 1);
+        $dayOfWeek = $firstDayOfMonth->dayOfWeekIso; // 1 (Mon) - 7 (Sun)
+        
+        if (in_array($dayOfWeek, [1, 2, 7])) {
+            return $firstDayOfMonth->copy()->previous(\Carbon\Carbon::SATURDAY);
+        } elseif ($dayOfWeek == 6) {
+            return $firstDayOfMonth->copy(); // It's exactly Saturday
+        } else {
+            return $firstDayOfMonth->copy()->next(\Carbon\Carbon::SATURDAY);
+        }
+    }
+
     private function autoGenerateLaporan($bulan, $tahun)
     {
         $bulanNum = str_pad($this->parseBulanToNumber($bulan), 2, '0', STR_PAD_LEFT);
@@ -287,10 +316,7 @@ class LaporanController extends Controller
         $anggotaIds = $jadwals->pluck('id_anggota')->unique();
         $regus = User::whereIn('id_user', $anggotaIds)->pluck('regu')->unique()->filter();
 
-        $firstDayOfMonth = \Carbon\Carbon::createFromDate($tahun, $bulanNum, 1);
-        $daysInMonth = $firstDayOfMonth->daysInMonth;
-        $firstDay = $firstDayOfMonth->dayOfWeekIso; // 1 (Mon) - 7 (Sun)
-        $totalWeeks = (int) ceil(($daysInMonth + $firstDay - 1) / 7);
+        $totalWeeks = 4; // Fix to 4 weeks per month for Laporan Mingguan
 
         foreach ($regus as $regu) {
             $danru = User::where('role', 'Danru')->where('regu', $regu)->where('status_aktif', 1)->first();
@@ -318,7 +344,6 @@ class LaporanController extends Controller
                     ],
                     [
                         'id_danru' => $danru->id_user,
-                        'shift_berjalan' => 'Shift Pagi',
                     ]
                 );
             }
@@ -334,17 +359,38 @@ class LaporanController extends Controller
             if ($type === 'bulanan') {
                 $lap->is_signable = \Carbon\Carbon::now()->gt($endOfMonth);
             } else {
-                $firstDayOfMonth = \Carbon\Carbon::createFromDate($lap->tahun, $bulanNum, 1);
-                $offset = $firstDayOfMonth->dayOfWeekIso - 1;
-                $lastDayOfWeek = ($lap->minggu_ke * 7) - $offset;
-                if ($lastDayOfWeek > $endOfMonth->day) {
-                    $lastDayOfWeek = $endOfMonth->day;
-                }
-                $endOfWeekDate = \Carbon\Carbon::createFromDate($lap->tahun, $bulanNum, $lastDayOfWeek)->endOfDay();
+                $startOfWeek1 = self::getStartOfWeek1($lap->tahun, $bulanNum);
+                // endOfWeekDate is Friday at 23:59:59 of that specific week (each week is 7 days)
+                $endOfWeekDate = $startOfWeek1->copy()->addDays(($lap->minggu_ke - 1) * 7 + 6)->endOfDay();
                 $lap->is_signable = \Carbon\Carbon::now()->gt($endOfWeekDate);
             }
             return $lap;
         });
+    }
+
+    public static function getWeekNumberForDate($date = null)
+    {
+        $carbon = $date ? \Carbon\Carbon::parse($date) : \Carbon\Carbon::now();
+        $tahun = $carbon->year;
+        $bulanNum = str_pad($carbon->month, 2, '0', STR_PAD_LEFT);
+        
+        $startOfWeek1 = self::getStartOfWeek1($tahun, $bulanNum);
+        
+        if ($carbon->lt($startOfWeek1)) {
+            return 1;
+        }
+        
+        $diffDays = $startOfWeek1->diffInDays($carbon->copy()->startOfDay());
+        $weekNum = (int) floor($diffDays / 7) + 1;
+        
+        if ($weekNum > 4) {
+            $weekNum = 4;
+        }
+        if ($weekNum < 1) {
+            $weekNum = 1;
+        }
+        
+        return $weekNum;
     }
 
     public function mingguan(Request $request)
@@ -359,10 +405,7 @@ class LaporanController extends Controller
         ];
         $defaultBulan = $defaultBulanMap[$now->month];
         $defaultTahun = $now->year;
-        
-        $firstDayOfMonth = $now->copy()->startOfMonth();
-        $offset = $firstDayOfMonth->dayOfWeekIso - 1;
-        $defaultMingguKe = (int) ceil(($now->day + $offset) / 7);
+        $defaultMingguKe = self::getWeekNumberForDate($now);
 
         $bulan = $request->input('bulan', $defaultBulan);
         $tahun = (int)$request->input('tahun', $defaultTahun);
@@ -373,7 +416,8 @@ class LaporanController extends Controller
 
         $laporanMingguanQuery = \App\Models\LaporanMingguan::with('danru')
             ->where('bulan', $bulan)
-            ->where('tahun', $tahun);
+            ->where('tahun', $tahun)
+            ->where('minggu_ke', '<=', 4);
         
         if (strtolower(trim($user->role)) === 'danru') {
             $laporanMingguanQuery->where('regu', trim($user->regu));
@@ -384,8 +428,8 @@ class LaporanController extends Controller
 
         $performanceData = $this->getLaporanData($bulan, $tahun, $minggu_ke, $filter_regu);
 
-        // Fetch list of distinct regu for the filter dropdown
-        $reguList = User::where('role', 'Danru')->where('status_aktif', 1)->pluck('regu')->filter()->unique()->values();
+        // Fetch list of distinct regu for the filter dropdown from regus table
+        $reguList = \App\Models\Regu::orderBy('nama_regu', 'asc')->pluck('nama_regu')->values();
 
         return Inertia::render('Laporan/Mingguan', [
             'laporanMingguan' => $laporanMingguan,
@@ -437,8 +481,8 @@ class LaporanController extends Controller
 
         $detailedMonthlyData = $this->getDetailedMonthlyData($bulan, $tahun, $filter_regu);
 
-        // Fetch list of distinct regu for the filter dropdown
-        $reguList = User::where('role', 'Danru')->where('status_aktif', 1)->pluck('regu')->filter()->unique()->values();
+        // Fetch list of distinct regu for the filter dropdown from regus table
+        $reguList = \App\Models\Regu::orderBy('nama_regu', 'asc')->pluck('nama_regu')->values();
 
         return Inertia::render('Laporan/Bulanan', [
             'laporanBulanan' => $laporanBulanan,
@@ -493,12 +537,15 @@ class LaporanController extends Controller
 
         if ($role === 'Danru') {
             $report->ttd_danru_url = $fileUrl;
+            $report->tgl_ttd_danru = now();
             $report->status_dokumen = 'Review_Chief';
         } elseif ($role === 'Chief') {
             $report->ttd_chief_url = $fileUrl;
+            $report->tgl_ttd_chief = now();
             $report->status_dokumen = 'Review_Klien';
         } elseif ($role === 'Klien') {
             $report->ttd_klien_url = $fileUrl;
+            $report->tgl_ttd_klien = now();
             $report->status_dokumen = 'Approved';
         }
 
@@ -543,9 +590,11 @@ class LaporanController extends Controller
 
         if ($role === 'Danru') {
             $report->ttd_danru_url = $fileUrl;
+            $report->tgl_ttd_danru = now();
             $report->status_dokumen = 'Review_Chief';
         } elseif ($role === 'Chief') {
             $report->ttd_chief_url = $fileUrl;
+            $report->tgl_ttd_chief = now();
             $report->status_dokumen = 'Approved';
         }
 
@@ -559,8 +608,9 @@ class LaporanController extends Controller
         $minggu_ke = (int)$request->query('minggu_ke', 1);
         $bulan = $request->query('bulan', 'Juli');
         $tahun = (int)$request->query('tahun', 2026);
+        $filter_regu = $request->query('filter_regu');
 
-        $performanceData = $this->getLaporanData($bulan, $tahun, $minggu_ke);
+        $performanceData = $this->getLaporanData($bulan, $tahun, $minggu_ke, $filter_regu);
         
         $user = Auth::user();
         $laporanMingguanQuery = \App\Models\LaporanMingguan::with('danru')
@@ -570,6 +620,8 @@ class LaporanController extends Controller
             
         if ($user && strtolower(trim($user->role)) === 'danru') {
             $laporanMingguanQuery->where('regu', trim($user->regu));
+        } else if ($filter_regu) {
+            $laporanMingguanQuery->where('regu', $filter_regu);
         }
         $laporanMingguan = $laporanMingguanQuery->first();
 
@@ -594,8 +646,9 @@ class LaporanController extends Controller
         $type = $request->query('type', 'pdf');
         $bulan = $request->query('bulan', 'Juli');
         $tahun = (int)$request->query('tahun', 2026);
+        $filter_regu = $request->query('filter_regu');
 
-        $detailedMonthlyData = $this->getDetailedMonthlyData($bulan, $tahun);
+        $detailedMonthlyData = $this->getDetailedMonthlyData($bulan, $tahun, $filter_regu);
         
         $user = Auth::user();
         $laporanQuery = LaporanBulanan::with('danruPembuat')
@@ -604,6 +657,8 @@ class LaporanController extends Controller
             
         if ($user && strtolower(trim($user->role)) === 'danru') {
             $laporanQuery->where('regu', trim($user->regu));
+        } else if ($filter_regu) {
+            $laporanQuery->where('regu', $filter_regu);
         }
         
         $laporanBulanan = $laporanQuery->first();

@@ -90,7 +90,7 @@ export const PREFERENCE_REGISTRY = {
 
   sidebar_variant: defineSSRPreference({
     values: SIDEBAR_VARIANT_VALUES,
-    defaultValue: "floating",
+    defaultValue: "inset",
     persistence: "client-cookie",
     attribute: "data-sidebar-variant",
   }),

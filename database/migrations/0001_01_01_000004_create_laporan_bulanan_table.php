@@ -21,8 +21,11 @@ return new class extends Migration
             
             // Signature fields (longText for Base64 data URLs)
             $table->longText('ttd_danru_url')->nullable();
+            $table->timestamp('tgl_ttd_danru')->nullable();
             $table->longText('ttd_chief_url')->nullable();
+            $table->timestamp('tgl_ttd_chief')->nullable();
             $table->longText('ttd_klien_url')->nullable();
+            $table->timestamp('tgl_ttd_klien')->nullable();
             
             $table->string('file_pdf_url', 255)->nullable();
             
