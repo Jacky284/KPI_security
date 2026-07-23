@@ -72,8 +72,11 @@ class AnggotaController extends Controller
             ];
         });
 
+        $reguList = \App\Models\Regu::orderBy('nama_regu', 'asc')->pluck('nama_regu')->values();
+
         return Inertia::render('Anggota/Index', [
             'anggota' => $anggotaData,
+            'reguList' => $reguList,
         ]);
     }
 
@@ -102,7 +105,7 @@ class AnggotaController extends Controller
         // 1. Get Riwayat Pelanggaran
         $riwayatPelanggaran = CatatanPelanggaran::with('danruPenilai')
             ->where('id_anggota', $id)
-            ->orderBy('tanggal_kejadian', 'desc')
+            ->orderBy('tanggal_penilaian', 'desc')
             ->get();
 
         // 2. Get Jadwal Minggu Ini
@@ -112,79 +115,68 @@ class AnggotaController extends Controller
             ->where('tahun', $currentYear)
             ->first();
 
-        // 3. Generate 3-Month Performance Data (Pagi vs Malam)
-        // Basic Logic: Start with 100 base score per shift category, subtract based on violations.
-        // A simple way to approximate this without knowing every single schedule day is:
-        // We look at the last 3 months.
-        
+        // 3. Generate 3-Month Performance Data (Per Indicator)
         $trendData = [];
-        for ($i = 2; $i >= 0; $i--) {
-            $targetDate = $now->copy()->subMonths($i);
+        $reqBulan = request('awal_bulan');
+        $reqTahun = request('tahun', $currentYear);
+        
+        $monthsArr = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        $defaultIndicators = ['Kedisiplinan', 'Kehadiran', 'Kerapihan', 'Komunikasi'];
+        
+        if ($reqBulan && in_array($reqBulan, $monthsArr)) {
+            $awalBulanNum = array_search($reqBulan, $monthsArr) + 1;
+            $startDate = Carbon::createFromDate($reqTahun, $awalBulanNum, 1);
+        } else {
+            $startDate = $now->copy()->subMonths(2)->startOfMonth();
+        }
+
+        for ($i = 0; $i < 3; $i++) {
+            $targetDate = clone $startDate;
+            $targetDate->addMonths($i);
+            
             $tMonth = $targetDate->month;
             $tYear = $targetDate->year;
             $tBulanStr = $defaultBulanMap[$tMonth];
             
-            // Get violations for this month
             $violationsThisMonth = CatatanPelanggaran::where('id_anggota', $id)
                 ->where('bulan', $tBulanStr)
                 ->where('tahun', $tYear)
                 ->get();
             
-            // Need to determine if violation was during Siang or Malam.
-            // We fetch the schedule for that month to check what shift they had on tanggal_kejadian.
             $jadwalThatMonth = JadwalBulanan::where('id_anggota', $id)
                 ->where('bulan', str_pad($tMonth, 2, '0', STR_PAD_LEFT))
                 ->where('tahun', $tYear)
                 ->first();
                 
-            $hasPagiShift = false;
-            $hasMalamShift = false;
-            if ($jadwalThatMonth && is_array($jadwalThatMonth->jadwal_harian)) {
-                foreach ($jadwalThatMonth->jadwal_harian as $d => $sStr) {
-                    $lower = strtolower((string)$sStr);
-                    if (strpos($lower, 'pagi') !== false || strpos($lower, 'siang') !== false) {
-                        $hasPagiShift = true;
-                    } elseif (strpos($lower, 'malam') !== false) {
-                        $hasMalamShift = true;
-                    }
-                }
-            }
-
-            $pagiDeduction = 0;
-            $malamDeduction = 0;
-
-            foreach ($violationsThisMonth as $v) {
-                $deduction = 5;
-                if ($v->tingkat_pelanggaran === 'Sedang') $deduction = 10;
-                if ($v->tingkat_pelanggaran === 'Berat') $deduction = 25;
-
-                $shift = 'Libur';
-                if ($jadwalThatMonth && is_array($jadwalThatMonth->jadwal_harian)) {
-                    $day = Carbon::parse($v->tanggal_kejadian)->format('j');
-                    $dailyShift = $jadwalThatMonth->jadwal_harian[$day] ?? 'Libur';
-                    $lowerD = strtolower((string)$dailyShift);
-                    if (strpos($lowerD, 'malam') !== false) {
-                        $shift = 'Malam';
-                    } elseif (strpos($lowerD, 'pagi') !== false || strpos($lowerD, 'siang') !== false) {
-                        $shift = 'Pagi';
-                    }
-                }
-
-                if ($shift === 'Malam') {
-                    $malamDeduction += $deduction;
-                } elseif ($shift === 'Pagi') {
-                    $pagiDeduction += $deduction;
-                }
-            }
-
-            $scorePagi = $hasPagiShift ? max(0, 100 - $pagiDeduction) : 0;
-            $scoreMalam = $hasMalamShift ? max(0, 100 - $malamDeduction) : 0;
-
-            $trendData[] = [
-                'name' => substr($tBulanStr, 0, 3), // e.g. "Mei", "Jun", "Jul"
-                'Pagi' => $scorePagi,
-                'Malam' => $scoreMalam,
+            $monthData = [
+                'name' => substr($tBulanStr, 0, 3)
             ];
+            
+            foreach ($defaultIndicators as $ind) {
+                $deduction = 0;
+                foreach ($violationsThisMonth as $v) {
+                    if ($v->kategori_indikator === $ind) {
+                        $penalty = 5;
+                        if ($v->tingkat_penilaian === 'Sedang') $penalty = 10;
+                        if ($v->tingkat_penilaian === 'Berat') $penalty = 25;
+                        $deduction += $penalty;
+                    }
+                }
+                
+                $hasSchedule = false;
+                if ($jadwalThatMonth && is_array($jadwalThatMonth->jadwal_harian)) {
+                    foreach ($jadwalThatMonth->jadwal_harian as $d => $sStr) {
+                        if ($sStr !== 'Libur') {
+                            $hasSchedule = true;
+                            break;
+                        }
+                    }
+                }
+                
+                $monthData[$ind] = $hasSchedule ? max(0, 100 - $deduction) : 0;
+            }
+            
+            $trendData[] = $monthData;
         }
 
         // 4. Calculate Indicator Breakdown (Last 3 Months Aggregated)
@@ -201,12 +193,13 @@ class AnggotaController extends Controller
             $indicatorHasMalam[$ind] = false;
         }
 
-        // Check overall scheduled shifts in last 3 months
-        $startOf3Months = $now->copy()->subMonths(2)->startOfMonth();
+        // Check overall scheduled shifts in selected 3 months
+        $startOf3Months = clone $startDate;
+        $endOf3Months = clone $startDate;
+        $endOf3Months->addMonths(2)->endOfMonth();
+
         $jadwal3Months = JadwalBulanan::where('id_anggota', $id)
-            ->where(function($q) use ($startOf3Months, $now) {
-                $q->whereIn('tahun', [$startOf3Months->year, $now->year]);
-            })
+            ->whereBetween('tahun', [$startOf3Months->year, $endOf3Months->year])
             ->get()->keyBy(function($j) { return $j->tahun . '-' . str_pad($j->bulan, 2, '0', STR_PAD_LEFT); });
 
         foreach ($jadwal3Months as $j) {
@@ -223,13 +216,13 @@ class AnggotaController extends Controller
         }
 
         $violations3Months = CatatanPelanggaran::where('id_anggota', $id)
-            ->whereDate('tanggal_kejadian', '>=', $startOf3Months)
+            ->whereBetween('tanggal_penilaian', [$startOf3Months->format('Y-m-d'), $endOf3Months->format('Y-m-d')])
             ->get();
 
         foreach ($violations3Months as $v) {
             $deduction = 5;
-            if ($v->tingkat_pelanggaran === 'Sedang') $deduction = 10;
-            if ($v->tingkat_pelanggaran === 'Berat') $deduction = 25;
+            if ($v->tingkat_penilaian === 'Sedang') $deduction = 10;
+            if ($v->tingkat_penilaian === 'Berat') $deduction = 25;
 
             $kategori = $v->kategori_indikator ?: 'Lainnya';
             if (!isset($indicatorDeductionPagi[$kategori])) {
@@ -239,7 +232,7 @@ class AnggotaController extends Controller
                 $indicatorHasMalam[$kategori] = true;
             }
 
-            $vDate = Carbon::parse($v->tanggal_kejadian);
+            $vDate = Carbon::parse($v->tanggal_penilaian);
             $jKey = $vDate->year . '-' . str_pad($vDate->month, 2, '0', STR_PAD_LEFT);
             $jadwalThatMonth = $jadwal3Months->get($jKey);
 
@@ -281,6 +274,29 @@ class AnggotaController extends Controller
             'jadwalBulanIni' => $jadwalBulanIni,
             'trendData' => $trendData,
             'indicatorTrendData' => $indicatorTrendData,
+            'filters' => [
+                'awal_bulan' => $defaultBulanMap[$startDate->month],
+                'tahun' => $startDate->year
+            ]
         ]);
+    }
+
+    public function pindahRegu(Request $request, $id)
+    {
+        $user = Auth::user();
+        if (!in_array($user?->role, ['Admin', 'Chief'])) {
+            abort(403, 'Akses ditolak. Hanya Admin atau Chief yang dapat memindahkan regu.');
+        }
+
+        $request->validate([
+            'regu' => 'required|string',
+        ]);
+
+        $anggota = User::findOrFail($id);
+        $anggota->update([
+            'regu' => $request->regu
+        ]);
+
+        return redirect()->back()->with('success', 'Anggota berhasil dipindahkan ke ' . $request->regu);
     }
 }

@@ -57,7 +57,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     setOpenMobile(false);
   }, [url, setOpenMobile]);
 
-  const itemsToRender = ["Admin", "Chief"].includes(userRole) ? [...adminItems, ...sidebarItems] : sidebarItems;
+  const itemsToRender = userRole === "Admin" ? [...adminItems, ...sidebarItems] : sidebarItems;
   const filteredItems = itemsToRender.map(group => {
     return {
       ...group,
@@ -68,8 +68,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         if (item.id === "input-pelanggaran") {
           return ["Admin", "Chief", "Danru"].includes(userRole);
         }
+        if (item.id === "catatan-harian") {
+          return ["Admin", "Chief", "Danru"].includes(userRole);
+        }
         if (item.id === "anggota") {
           return ["Admin", "Chief", "Danru"].includes(userRole);
+        }
+        if (item.id === "laporan-bulanan") {
+          return ["Admin", "Chief"].includes(userRole);
         }
         return true;
       })
@@ -95,9 +101,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <Link prefetch={false} href="/">
-                <Command />
-                <span className="font-semibold text-base">{APP_CONFIG.name}</span>
+              <Link prefetch={false} href="/" className="flex items-center gap-2">
+                <img src="/images/logo-app.png" alt="Logo" className="w-10 h-10 object-contain" />
+                <span className="font-semibold text-base">KPI Security</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

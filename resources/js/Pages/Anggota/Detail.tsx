@@ -1,5 +1,5 @@
 import React from "react";
-import { Head, Link } from "@inertiajs/react";
+import { Head, Link, router } from "@inertiajs/react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -7,12 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from "recharts";
 import { MapPin, Calendar, Clock, Briefcase, FileWarning, ArrowLeft, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface CatatanPelanggaran {
   id_catatan: number;
-  tanggal_kejadian: string;
-  tingkat_pelanggaran: string;
-  deskripsi_kejadian: string;
+  tanggal_penilaian: string;
+  tingkat_penilaian: string;
+  deskripsi_penilaian: string;
   danru_penilai: { nama_lengkap: string } | null;
 }
 
@@ -24,8 +25,11 @@ interface JadwalBulanan {
 
 interface TrendData {
   name: string;
-  Siang: number;
-  Malam: number;
+  Kedisiplinan?: number;
+  Kehadiran?: number;
+  Kerapihan?: number;
+  Komunikasi?: number;
+  [key: string]: any;
 }
 
 interface User {
@@ -44,9 +48,14 @@ interface Props {
   jadwalBulanIni: JadwalBulanan | null;
   trendData: TrendData[];
   indicatorTrendData?: TrendData[];
+  filters?: {
+    awal_bulan: string;
+    tahun: number;
+  };
 }
 
-export default function Detail({ anggota, riwayatPelanggaran, jadwalBulanIni, trendData, indicatorTrendData }: Props) {
+export default function Detail({ anggota, riwayatPelanggaran, jadwalBulanIni, trendData, indicatorTrendData, filters }: Props) {
+
 
   // Format Tanggal Lahir
   const formatDate = (dateStr: string | null) => {
@@ -132,12 +141,28 @@ export default function Detail({ anggota, riwayatPelanggaran, jadwalBulanIni, tr
 
             {/* Chart */}
             <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle>Tren Kinerja (3 Bulan Terakhir)</CardTitle>
-                <CardDescription>Perbandingan skor kedisiplinan antara Shift Pagi dan Shift Malam. Skor dasar 100.</CardDescription>
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <CardTitle>Tren Kinerja (3 Bulan Terakhir)</CardTitle>
+                  <CardDescription>Perbandingan skor per indikator kinerja. Skor dasar 100.</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={filters?.awal_bulan || "Januari"} onValueChange={(val) => {
+                    router.get(`/anggota/${anggota.id_user}`, { awal_bulan: val, tahun: filters?.tahun || new Date().getFullYear() }, { preserveScroll: true });
+                  }}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="Mulai Bulan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"].map(m => (
+                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="h-[300px] w-full">
+                <div className="h-[300px] w-full mt-2">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={trendData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
@@ -146,45 +171,11 @@ export default function Detail({ anggota, riwayatPelanggaran, jadwalBulanIni, tr
                       <RechartsTooltip
                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                       />
-                      <Legend
-                        verticalAlign="top"
-                        content={() => (
-                          <div className="flex justify-center items-center gap-6 text-xs pb-4">
-                            <div className="flex items-center gap-2">
-                              <svg className="w-5 h-2.5" viewBox="0 0 24 10">
-                                <line x1="0" y1="5" x2="24" y2="5" stroke="#0ea5e9" strokeWidth="2.5" />
-                                <circle cx="12" cy="5" r="3" fill="#ffffff" stroke="#0ea5e9" strokeWidth="2" />
-                              </svg>
-                              <span className="font-medium text-foreground">Shift Pagi</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <svg className="w-5 h-2.5" viewBox="0 0 24 10">
-                                <line x1="0" y1="5" x2="24" y2="5" stroke="#6366f1" strokeWidth="2.5" />
-                                <circle cx="12" cy="5" r="3.5" fill="#ffffff" stroke="#6366f1" strokeWidth="2" />
-                              </svg>
-                              <span className="font-medium text-foreground">Shift Malam</span>
-                            </div>
-                          </div>
-                        )}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="Pagi"
-                        name="Shift Pagi"
-                        stroke="#0ea5e9" // Sky blue for Morning
-                        strokeWidth={3}
-                        dot={{ r: 4, strokeWidth: 2 }}
-                        activeDot={{ r: 6 }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="Malam"
-                        name="Shift Malam"
-                        stroke="#6366f1" // Indigo/Blue for Night
-                        strokeWidth={3}
-                        dot={{ r: 4, strokeWidth: 2 }}
-                        activeDot={{ r: 8 }}
-                      />
+                      <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                      <Line type="monotone" dataKey="Kedisiplinan" name="Kedisiplinan" stroke="#0ea5e9" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                      <Line type="monotone" dataKey="Kehadiran" name="Kehadiran" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                      <Line type="monotone" dataKey="Kerapihan" name="Kerapihan" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                      <Line type="monotone" dataKey="Komunikasi" name="Komunikasi" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -246,12 +237,12 @@ export default function Detail({ anggota, riwayatPelanggaran, jadwalBulanIni, tr
                       <div key={p.id_catatan} className="flex justify-between items-start border-b pb-4 last:border-0 last:pb-0">
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-sm">{formatDate(p.tanggal_kejadian)}</span>
-                            <Badge variant={p.tingkat_pelanggaran === 'Berat' ? 'destructive' : p.tingkat_pelanggaran === 'Sedang' ? 'default' : 'secondary'} className="text-[10px]">
-                              {p.tingkat_pelanggaran}
+                            <span className="font-semibold text-sm">{formatDate(p.tanggal_penilaian)}</span>
+                            <Badge variant={p.tingkat_penilaian === 'Berat' ? 'destructive' : p.tingkat_penilaian === 'Sedang' ? 'default' : 'secondary'} className="text-[10px]">
+                              {p.tingkat_penilaian}
                             </Badge>
                           </div>
-                          <p className="text-sm text-muted-foreground">{p.deskripsi_kejadian}</p>
+                          <p className="text-sm text-muted-foreground">{p.deskripsi_penilaian}</p>
                           <p className="text-xs text-muted-foreground/60 italic">Dinilai oleh: {p.danru_penilai?.nama_lengkap || "Sistem"}</p>
                         </div>
                       </div>

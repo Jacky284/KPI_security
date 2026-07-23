@@ -1,6 +1,6 @@
 import { Head, router } from "@inertiajs/react";
 import React, { useState } from "react";
-import DashboardLayout from "@/layouts/DashboardLayout";
+import DashboardLayout from "@/Layouts/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,18 +9,19 @@ interface Pelanggaran {
   id_catatan: number;
   id_anggota: number;
   id_penilai: number;
-  tanggal_kejadian: string;
+  tanggal_penilaian: string;
   minggu_ke: number;
   bulan: string;
   tahun: number;
   kategori_indikator: string;
-  tingkat_pelanggaran: string;
-  deskripsi_kejadian: string;
+  tingkat_penilaian: string;
+  deskripsi_penilaian: string;
   status_tindak_lanjut: string;
   anggota?: {
     id_user: number;
     nama_lengkap: string;
     regu: string;
+    role?: string;
   };
   danru_penilai?: {
     id_user: number;
@@ -41,13 +42,18 @@ interface Props {
 export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan, selectedTahun, selectedMinggu, filterRegu, reguList }: Props) {
   const [processingId, setProcessingId] = useState<number | null>(null);
 
-  const formatDateDMY = (dateStr: string | null) => {
+  const formatDayName = (dateStr: string | null) => {
     if (!dateStr) return "-";
-    const parts = dateStr.split("-");
-    if (parts.length === 3) {
-      return `${parts[2]}-${parts[1]}-${parts[0]}`;
-    }
-    return dateStr;
+    const d = new Date(dateStr);
+    const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    return days[d.getDay()];
+  };
+
+  const formatDateFull = (dateStr: string | null) => {
+    if (!dateStr) return "-";
+    const d = new Date(dateStr);
+    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
   };
 
   const handleTindakLanjut = (id: number) => {
@@ -61,16 +67,19 @@ export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan
   };
 
   const getBadgeColor = (tingkat: string) => {
-    switch (tingkat) {
-      case "Ringan":
-        return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
-      case "Sedang":
-        return "bg-orange-500/10 text-orange-600 border-orange-500/20";
-      case "Berat":
-        return "bg-red-500/10 text-red-600 border-red-500/20";
-      default:
-        return "";
+    if (["Ringan 1 kali", "Kurang rapi 1 kali", "Terlambat 1 kali", "Komplain ringan"].includes(tingkat)) {
+      return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
     }
+    if (["Ringan 2 kali", "Kurang rapi 2 kali", "Terlambat 2 kali", "Komplain sedang"].includes(tingkat)) {
+      return "bg-orange-500/10 text-orange-600 border-orange-500/20";
+    }
+    if (["Sedang", "Seragam tidak lengkap", "Tidak hadir dengan izin", "Sering mendapat teguran"].includes(tingkat)) {
+      return "bg-orange-500/20 text-orange-700 border-orange-500/30";
+    }
+    if (["Berat", "Penampilan tidak sesuai Standar", "Mangkir / Alpha", "Komplain berat"].includes(tingkat)) {
+      return "bg-red-500/10 text-red-600 border-red-500/20";
+    }
+    return "bg-gray-500/10 text-gray-600 border-gray-500/20";
   };
 
   const listBulan = [
@@ -96,11 +105,11 @@ export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan
 
   return (
     <>
-      <Head title="Daftar Pelanggaran" />
+      <Head title="Daftar Penilaian" />
       <div className="flex flex-col gap-6 max-w-7xl mx-auto">
         <div>
-          <h1 className="text-2xl font-bold text-primary tracking-tight">Daftar Catatan Pelanggaran</h1>
-          <p className="text-sm text-muted-foreground">Riwayat pelanggaran kinerja personel sekuriti. Chief Security wajib menindaklanjuti setiap laporan.</p>
+          <h1 className="text-2xl font-bold text-primary tracking-tight">Daftar Catatan Penilaian</h1>
+          <p className="text-sm text-muted-foreground">Riwayat catatan penilaian kinerja personel sekuriti. Chief Security wajib menindaklanjuti setiap laporan.</p>
         </div>
 
         {/* Filters */}
@@ -177,7 +186,7 @@ export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan
                     <th className="p-3">Regu</th>
                     <th className="p-3">Pelanggaran</th>
                     <th className="p-3">Tingkat</th>
-                    <th className="p-3">Danru Pelapor</th>
+                    <th className="p-3">{userRole === 'Chief' ? 'Chief Penilai' : 'Danru Pelapor'}</th>
                     <th className="p-3 text-center">Tindak Lanjut</th>
                   </tr>
                 </thead>
@@ -186,18 +195,25 @@ export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan
                     pelanggaran.map((p) => (
                       <tr key={p.id_catatan} className="border-b align-top hover:bg-muted/5">
                         <td className="p-3">
-                          <div className="font-semibold">{formatDateDMY(p.tanggal_kejadian)}</div>
-                          <div className="text-xs text-muted-foreground">M{p.minggu_ke} - {p.bulan} {p.tahun}</div>
+                          <div className="text-xs text-muted-foreground font-semibold uppercase">{formatDayName(p.tanggal_penilaian)}</div>
+                          <div className="font-bold text-sm">{formatDateFull(p.tanggal_penilaian)}</div>
                         </td>
-                        <td className="p-3 font-bold">{p.anggota?.nama_lengkap}</td>
+                        <td className="p-3 font-bold">
+                          <div className="flex items-center gap-2">
+                            <span>{p.anggota?.nama_lengkap}</span>
+                            {p.anggota?.role === 'Danru' && (
+                              <span className="bg-destructive/15 text-destructive font-bold text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">Danru</span>
+                            )}
+                          </div>
+                        </td>
                         <td className="p-3 font-semibold whitespace-nowrap">{p.anggota?.regu}</td>
                         <td className="p-3">
                           <div className="font-semibold text-primary">{p.kategori_indikator}</div>
-                          <div className="text-xs text-muted-foreground mt-1">{p.deskripsi_kejadian}</div>
+                          <div className="text-xs text-muted-foreground mt-1">{p.deskripsi_penilaian}</div>
                         </td>
                         <td className="p-3">
-                          <Badge variant="outline" className={getBadgeColor(p.tingkat_pelanggaran)}>
-                            {p.tingkat_pelanggaran}
+                          <Badge variant="outline" className={getBadgeColor(p.tingkat_penilaian)}>
+                            {p.tingkat_penilaian}
                           </Badge>
                         </td>
                         <td className="p-3">{p.danru_penilai?.nama_lengkap}</td>
@@ -209,11 +225,11 @@ export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan
                           ) : (
                             <div className="flex flex-col items-center gap-2">
                               <Badge variant="destructive" className="shadow-none">Belum</Badge>
-                              {(userRole === "Chief" || userRole === "Admin") && (
-                                <Button 
-                                  size="sm" 
-                                  variant="outline" 
-                                  className="h-7 text-xs" 
+                              {(userRole === "Chief" || userRole === "Admin" || userRole === "Danru") && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs"
                                   onClick={() => handleTindakLanjut(p.id_catatan)}
                                   disabled={processingId === p.id_catatan}
                                 >
@@ -243,30 +259,35 @@ export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan
                   <div key={p.id_catatan} className="flex flex-col gap-3 p-4 border rounded-xl bg-card shadow-sm">
                     <div className="flex justify-between items-start border-b pb-3">
                       <div>
-                        <div className="font-bold text-foreground text-sm">{p.anggota?.nama_lengkap}</div>
+                        <div className="flex items-center gap-2">
+                          <div className="font-bold text-foreground text-sm">{p.anggota?.nama_lengkap}</div>
+                          {p.anggota?.role === 'Danru' && (
+                            <span className="bg-destructive/15 text-destructive font-bold text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">Danru</span>
+                          )}
+                        </div>
                         <span className="inline-block mt-1 bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] font-bold uppercase">{p.anggota?.regu}</span>
                       </div>
                       <div className="flex flex-col items-end gap-1">
-                        <div className="font-semibold text-xs">{formatDateDMY(p.tanggal_kejadian)}</div>
-                        <div className="text-[10px] text-muted-foreground">M{p.minggu_ke} - {p.bulan} {p.tahun}</div>
+                        <div className="text-[10px] text-muted-foreground font-semibold uppercase">{formatDayName(p.tanggal_penilaian)}</div>
+                        <div className="font-bold text-xs">{formatDateFull(p.tanggal_penilaian)}</div>
                       </div>
                     </div>
-                    
+
                     <div className="flex flex-col gap-1 mt-1">
                       <div className="flex justify-between items-center">
                         <span className="font-semibold text-primary text-sm">{p.kategori_indikator}</span>
-                        <Badge variant="outline" className={`text-[10px] ${getBadgeColor(p.tingkat_pelanggaran)}`}>
-                          {p.tingkat_pelanggaran}
+                        <Badge variant="outline" className={`text-[10px] ${getBadgeColor(p.tingkat_penilaian)}`}>
+                          {p.tingkat_penilaian}
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1 bg-muted/30 p-2 rounded border">
-                        {p.deskripsi_kejadian}
+                        {p.deskripsi_penilaian}
                       </p>
                       <div className="text-[10px] text-muted-foreground mt-2">
-                        Dilaporkan oleh: <span className="font-semibold">{p.danru_penilai?.nama_lengkap}</span>
+                        {userRole === 'Chief' ? 'Dinilai oleh:' : 'Dilaporkan oleh:'} <span className="font-semibold">{p.danru_penilai?.nama_lengkap}</span>
                       </div>
                     </div>
-                    
+
                     <div className="flex justify-between items-center border-t pt-3 mt-1">
                       <span className="text-xs font-bold text-muted-foreground uppercase">Tindak Lanjut</span>
                       {p.status_tindak_lanjut === "Sudah" ? (
@@ -276,11 +297,11 @@ export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan
                       ) : (
                         <div className="flex items-center gap-2">
                           <Badge variant="destructive" className="shadow-none">Belum</Badge>
-                          {(userRole === "Chief" || userRole === "Admin") && (
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              className="h-7 text-xs" 
+                          {(userRole === "Chief" || userRole === "Admin" || userRole === "Danru") && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs"
                               onClick={() => handleTindakLanjut(p.id_catatan)}
                               disabled={processingId === p.id_catatan}
                             >

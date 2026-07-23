@@ -4,6 +4,7 @@ import DashboardLayout from "@/Layouts/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SignaturePad } from "@/components/SignaturePad";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface DanruPembuat {
   id_user: number;
@@ -22,15 +23,16 @@ interface LaporanBulanan {
   ttd_klien_url: string | null;
   file_pdf_url: string | null;
   is_signable?: boolean;
+  all_weekly_approved?: boolean;
   danru_pembuat: DanruPembuat;
 }
 
 interface Violation {
   id_catatan: number;
   kategori_indikator: string;
-  tingkat_pelanggaran: string;
-  tanggal_kejadian: string;
-  deskripsi_kejadian: string;
+  tingkat_penilaian: string;
+  tanggal_penilaian: string;
+  deskripsi_penilaian: string;
 }
 
 interface OfficerPerformance {
@@ -104,6 +106,8 @@ export default function LaporanBulanan({
   currentUser,
 }: Props) {
   const [activeSignatures, setActiveSignatures] = useState<Record<number, string>>({});
+  const [activeTab, setActiveTab] = useState<"anggota" | "danru">("anggota");
+
   const listBulan = [
     "Januari", "Februari", "Maret", "April", "Mei", "Juni",
     "Juli", "Agustus", "September", "Oktober", "November", "Desember"
@@ -160,9 +164,16 @@ export default function LaporanBulanan({
   };
 
   const availableWeeks = getAvailableWeeks(selectedBulan, selectedTahun);
-  const canExportBulanan = laporanBulanan.length > 0;
 
-  const visibleLaporan = laporanBulanan;
+  // Filter based on activeTab (for Chief)
+  const visibleLaporan = laporanBulanan.filter(report => {
+    if (activeTab === "danru") return report.regu === "Laporan_Danru";
+    return report.regu === "Semua";
+  });
+
+  const canExportBulanan = visibleLaporan.length > 0;
+
+
 
   return (
     <>
@@ -204,34 +215,39 @@ export default function LaporanBulanan({
               />
             </div>
 
-            {(currentUser.role === "Chief" || currentUser.role === "Admin") && reguList && reguList.length > 0 && (
-              <div className="flex flex-col gap-1 md:border-l md:pl-4 w-full md:w-auto col-span-2 md:col-span-1">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Filter Regu</label>
-                <select
-                  value={filterRegu || ""}
-                  onChange={(e) => handleFilterChange(selectedBulan, selectedTahun, e.target.value)}
-                  className="p-2 text-sm border rounded-md bg-background focus:ring-2 focus:ring-primary/50 w-full"
-                >
-                  <option value="">Semua Regu</option>
-                  {reguList.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
-              </div>
-            )}
+
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-2 md:border-l md:pl-4 md:ml-auto w-full md:w-auto">
             <Button asChild variant="outline" size="sm" className={`w-full sm:w-auto bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200 ${!canExportBulanan ? 'pointer-events-none opacity-50' : ''}`}>
-              <a href={canExportBulanan ? `/export/laporan-bulanan?type=excel&bulan=${selectedBulan}&tahun=${selectedTahun}${filterRegu ? `&filter_regu=${filterRegu}` : ''}` : '#'} target={canExportBulanan ? "_blank" : undefined}>
+              <a href={canExportBulanan ? `/export/laporan-bulanan?type=excel&bulan=${selectedBulan}&tahun=${selectedTahun}${filterRegu ? `&filter_regu=${filterRegu}` : ''}${activeTab === 'danru' ? '&jenis=danru' : ''}` : '#'} target={canExportBulanan ? "_blank" : undefined}>
                 Export Excel
               </a>
             </Button>
             <Button asChild variant="outline" size="sm" className={`w-full sm:w-auto bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 border-red-200 ${!canExportBulanan ? 'pointer-events-none opacity-50' : ''}`}>
-              <a href={canExportBulanan ? `/export/laporan-bulanan?type=pdf&bulan=${selectedBulan}&tahun=${selectedTahun}${filterRegu ? `&filter_regu=${filterRegu}` : ''}` : '#'} target={canExportBulanan ? "_blank" : undefined}>
+              <a href={canExportBulanan ? `/export/laporan-bulanan?type=pdf&bulan=${selectedBulan}&tahun=${selectedTahun}${filterRegu ? `&filter_regu=${filterRegu}` : ''}${activeTab === 'danru' ? '&jenis=danru' : ''}` : '#'} target={canExportBulanan ? "_blank" : undefined}>
                 Export PDF
               </a>
             </Button>
           </div>
         </div>
+
+        {currentUser.role === "Chief" && (
+          <div className="flex bg-muted/50 p-1 rounded-lg w-fit">
+            <button 
+              onClick={() => setActiveTab("anggota")} 
+              className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${activeTab === "anggota" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Laporan Anggota
+            </button>
+            <button 
+              onClick={() => setActiveTab("danru")} 
+              className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${activeTab === "danru" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Laporan Danru
+            </button>
+          </div>
+        )}
 
         {/* Section 3: Monthly Approval Workflow */}
         <Card className="shadow-xs border mt-2">
@@ -241,7 +257,7 @@ export default function LaporanBulanan({
                 Status Tanda Tangan Laporan Bulanan
               </CardTitle>
               <CardDescription>
-                Alur otorisasi dokumen kinerja: Danru &rarr; Chief Security &rarr; Klien (Pengguna Jasa).
+                Alur otorisasi dokumen kinerja: Chief Security &rarr; Klien (Pengguna Jasa).
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
@@ -255,88 +271,72 @@ export default function LaporanBulanan({
                 <thead>
                   <tr className="border-b bg-muted/50 text-muted-foreground font-bold">
                     <th className="p-3">Periode</th>
-                    <th className="p-3">Regu</th>
-                    <th className="p-3">Danru Pembuat</th>
                     <th className="p-3">Status</th>
-                    <th className="p-3">Tanda Tangan Danru</th>
                     <th className="p-3">Tanda Tangan Chief</th>
                     <th className="p-3">Tanda Tangan Klien</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleLaporan.map((report) => {
-                    const isDraft = report.status_dokumen === "Draft";
-                    const isReviewChief = report.status_dokumen === "Review_Chief";
-                    const isReviewKlien = report.status_dokumen === "Review_Klien";
+                  {visibleLaporan.length > 0 ? (
+                    visibleLaporan.map((report) => {
+                      const isReviewChief = report.status_dokumen === "Draft" || report.status_dokumen === "Review_Chief";
+                      const isReviewKlien = report.status_dokumen === "Review_Klien";
 
-                    const canDanruSign = currentUser.role === "Danru" && isDraft;
-                    const canChiefSign = currentUser.role === "Chief" && isReviewChief;
-                    const canKlienSign = currentUser.role === "Klien" && isReviewKlien;
-                    const isSignable = report.is_signable !== false;
+                      const canChiefSign = currentUser.role === "Chief" && isReviewChief && report.all_weekly_approved;
+                      const canKlienSign = currentUser.role === "Klien" && isReviewKlien;
 
-                    return (
-                      <tr key={report.id_laporan_bulanan} className="border-b align-top hover:bg-muted/5">
-                        <td className="p-3 font-bold text-foreground">
-                          {report.bulan} {report.tahun}
-                        </td>
-                        <td className="p-3 font-semibold whitespace-nowrap">{report.regu}</td>
-                        <td className="p-3">{report.danru_pembuat?.nama_lengkap || "-"}</td>
-                        <td className="p-3">{getStatusBadge(report.status_dokumen)}</td>
+                      return (
+                        <tr key={report.id_laporan_bulanan} className="border-b align-top hover:bg-muted/5">
+                          <td className="p-3 font-bold text-foreground">
+                            {report.bulan} {report.tahun}
+                          </td>
+                          <td className="p-3">{getStatusBadge(report.status_dokumen)}</td>
 
-                        {/* Danru Signature */}
-                        <td className="p-3">
-                          {report.ttd_danru_url ? (
-                            <img src={report.ttd_danru_url} alt="TTD Danru" className="max-h-16 object-contain border rounded bg-white p-1" />
-                          ) : canDanruSign ? (
-                            isSignable ? (
-                              <div className="min-w-[180px]">
-                                <SignaturePad
-                                  label="Tanda Tangan Danru"
-                                  onConfirm={(data) => handleSaveSignature(report.id_laporan_bulanan, data)}
-                                />
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground italic font-semibold">(Terkunci hingga akhir bulan)</span>
-                            )
-                          ) : (
-                            <span className="text-xs text-muted-foreground italic">Menunggu...</span>
-                          )}
-                        </td>
+                          {/* Chief Signature */}
+                              <td className="p-3">
+                                {report.ttd_chief_url ? (
+                                  <img src={report.ttd_chief_url} alt="TTD Chief" className="max-h-16 object-contain border rounded bg-white p-1" />
+                                ) : canChiefSign ? (
+                                  <div className="min-w-[180px]">
+                                    <SignaturePad
+                                      label="Tanda Tangan Chief"
+                                      onConfirm={(data) => handleSaveSignature(report.id_laporan_bulanan, data)}
+                                    />
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground italic">
+                                    {currentUser.role === "Chief" && isReviewChief && !report.all_weekly_approved 
+                                      ? "Menunggu Laporan Mingguan Disetujui..." 
+                                      : "Menunggu..."}
+                                  </span>
+                                )}
+                              </td>
 
-                        {/* Chief Signature */}
-                        <td className="p-3">
-                          {report.ttd_chief_url ? (
-                            <img src={report.ttd_chief_url} alt="TTD Chief" className="max-h-16 object-contain border rounded bg-white p-1" />
-                          ) : canChiefSign ? (
-                            <div className="min-w-[180px]">
-                              <SignaturePad
-                                label="Tanda Tangan Chief"
-                                onConfirm={(data) => handleSaveSignature(report.id_laporan_bulanan, data)}
-                              />
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground italic">Menunggu...</span>
-                          )}
-                        </td>
-
-                        {/* Client Signature */}
-                        <td className="p-3">
-                          {report.ttd_klien_url ? (
-                            <img src={report.ttd_klien_url} alt="TTD Klien" className="max-h-16 object-contain border rounded bg-white p-1" />
-                          ) : canKlienSign ? (
-                            <div className="min-w-[180px]">
-                              <SignaturePad
-                                label="Tanda Tangan Klien"
-                                onConfirm={(data) => handleSaveSignature(report.id_laporan_bulanan, data)}
-                              />
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground italic">Menunggu...</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                              {/* Client Signature */}
+                              <td className="p-3">
+                                {report.ttd_klien_url ? (
+                                  <img src={report.ttd_klien_url} alt="TTD Klien" className="max-h-16 object-contain border rounded bg-white p-1" />
+                                ) : canKlienSign ? (
+                                  <div className="min-w-[180px]">
+                                    <SignaturePad
+                                      label="Tanda Tangan Klien"
+                                      onConfirm={(data) => handleSaveSignature(report.id_laporan_bulanan, data)}
+                                    />
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground italic">Menunggu...</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="p-6 text-center text-muted-foreground italic">
+                        Belum ada laporan bulanan.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -345,88 +345,55 @@ export default function LaporanBulanan({
             <div className="lg:hidden flex flex-col gap-4 p-2">
               {visibleLaporan.length > 0 ? (
                 visibleLaporan.map((report) => {
-                  const isDraft = report.status_dokumen === "Draft";
-                  const isReviewChief = report.status_dokumen === "Review_Chief";
+                  const isReviewChief = report.status_dokumen === "Draft" || report.status_dokumen === "Review_Chief";
                   const isReviewKlien = report.status_dokumen === "Review_Klien";
 
-                  const canDanruSign = currentUser.role === "Danru" && isDraft;
-                  const canChiefSign = currentUser.role === "Chief" && isReviewChief;
+                  const canChiefSign = currentUser.role === "Chief" && isReviewChief && report.all_weekly_approved;
                   const canKlienSign = currentUser.role === "Klien" && isReviewKlien;
-                  const isSignable = report.is_signable !== false;
 
                   return (
-                    <div key={report.id_laporan_bulanan} className="flex flex-col gap-3 p-4 border rounded-xl bg-card shadow-sm">
-                      <div className="flex justify-between items-start border-b pb-3">
-                        <div>
-                          <div className="font-bold text-foreground text-sm">{report.bulan} {report.tahun}</div>
-                          <span className="inline-block mt-1 bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] font-bold uppercase">{report.regu}</span>
-                        </div>
-                        <div className="flex flex-col items-end gap-2">
-                          {getStatusBadge(report.status_dokumen)}
-                          <div className="text-[10px] text-muted-foreground">Oleh: {report.danru_pembuat?.nama_lengkap || "-"}</div>
-                        </div>
+                    <div key={report.id_laporan_bulanan} className="border p-4 rounded-lg bg-card shadow-sm flex flex-col gap-3">
+                      <div className="flex justify-between items-center border-b pb-2">
+                        <span className="font-bold text-foreground">{report.bulan} {report.tahun}</span>
+                        {getStatusBadge(report.status_dokumen)}
                       </div>
-                      <div className="flex flex-col gap-3 mt-1">
-                        {/* Danru Sign */}
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase">Tanda Tangan Danru</span>
-                          {report.ttd_danru_url ? (
-                            <img src={report.ttd_danru_url} alt="TTD Danru" className="max-h-16 object-contain border rounded bg-white p-1 self-start" />
-                          ) : canDanruSign ? (
-                            isSignable ? (
-                              <div className="w-full">
-                                <SignaturePad
-                                  label="Tanda Tangan Danru"
-                                  onConfirm={(data) => handleSaveSignature(report.id_laporan_bulanan, data)}
-                                />
+                              
+                              <div className="flex flex-col gap-2">
+                                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tanda Tangan Chief</span>
+                                {report.ttd_chief_url ? (
+                                  <img src={report.ttd_chief_url} alt="TTD Chief" className="max-h-16 object-contain border rounded bg-white p-1 self-start" />
+                                ) : canChiefSign ? (
+                                  <SignaturePad
+                                    label="Tanda Tangan Chief"
+                                    onConfirm={(data) => handleSaveSignature(report.id_laporan_bulanan, data)}
+                                  />
+                                ) : (
+                                  <span className="text-xs text-muted-foreground italic">
+                                    {currentUser.role === "Chief" && isReviewChief && !report.all_weekly_approved 
+                                      ? "Menunggu Laporan Mingguan Disetujui..." 
+                                      : "Menunggu..."}
+                                  </span>
+                                )}
                               </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground italic font-semibold">(Terkunci hingga akhir bulan)</span>
-                            )
-                          ) : (
-                            <span className="text-xs text-muted-foreground italic">Menunggu...</span>
-                          )}
-                        </div>
-
-                        {/* Chief Sign */}
-                        <div className="flex flex-col gap-1 border-t pt-2">
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase">Tanda Tangan Chief</span>
-                          {report.ttd_chief_url ? (
-                            <img src={report.ttd_chief_url} alt="TTD Chief" className="max-h-16 object-contain border rounded bg-white p-1 self-start" />
-                          ) : canChiefSign ? (
-                            <div className="w-full">
-                              <SignaturePad
-                                label="Tanda Tangan Chief"
-                                onConfirm={(data) => handleSaveSignature(report.id_laporan_bulanan, data)}
-                              />
+                              
+                              <div className="flex flex-col gap-2 pt-2 border-t">
+                                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tanda Tangan Klien</span>
+                                {report.ttd_klien_url ? (
+                                  <img src={report.ttd_klien_url} alt="TTD Klien" className="max-h-16 object-contain border rounded bg-white p-1 self-start" />
+                                ) : canKlienSign ? (
+                                  <SignaturePad
+                                    label="Tanda Tangan Klien"
+                                    onConfirm={(data) => handleSaveSignature(report.id_laporan_bulanan, data)}
+                                  />
+                                ) : (
+                                  <span className="text-xs text-muted-foreground italic">Menunggu...</span>
+                                )}
+                              </div>
                             </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground italic">Menunggu...</span>
-                          )}
-                        </div>
-
-                        {/* Client Sign */}
-                        <div className="flex flex-col gap-1 border-t pt-2">
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase">Tanda Tangan Klien</span>
-                          {report.ttd_klien_url ? (
-                            <img src={report.ttd_klien_url} alt="TTD Klien" className="max-h-16 object-contain border rounded bg-white p-1 self-start" />
-                          ) : canKlienSign ? (
-                            <div className="w-full">
-                              <SignaturePad
-                                label="Tanda Tangan Klien"
-                                onConfirm={(data) => handleSaveSignature(report.id_laporan_bulanan, data)}
-                              />
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground italic">Menunggu...</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
+                          );
                 })
               ) : (
-                <div className="p-8 text-center text-muted-foreground border rounded-xl border-dashed">
+                <div className="text-center p-8 text-muted-foreground border rounded-xl">
                   Belum ada laporan bulanan.
                 </div>
               )}

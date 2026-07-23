@@ -12,8 +12,8 @@ class AdminController extends Controller
 {
     private function checkAdmin()
     {
-        if (!in_array(Auth::user()?->role, ['Admin', 'Chief'])) {
-            abort(403, 'Akses ditolak. Hanya administrator dan chief yang dapat mengakses halaman ini.');
+        if (Auth::user()?->role !== 'Admin') {
+            abort(403, 'Akses ditolak. Hanya administrator yang dapat mengakses halaman ini.');
         }
     }
 

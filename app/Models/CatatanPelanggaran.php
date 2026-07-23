@@ -13,13 +13,13 @@ class CatatanPelanggaran extends Model
     protected $fillable = [
         'id_anggota',
         'id_penilai',
-        'tanggal_kejadian',
+        'tanggal_penilaian',
         'minggu_ke',
         'bulan',
         'tahun',
         'kategori_indikator',
-        'tingkat_pelanggaran',
-        'deskripsi_kejadian',
+        'tingkat_penilaian',
+        'deskripsi_penilaian',
         'status_tindak_lanjut',
     ];
 

@@ -79,15 +79,16 @@
                     <thead>
                         <tr>
                             <th rowspan="2" style="width: 5%;">NO</th>
-                            <th rowspan="2" style="width: 25%;">NAMA PERSONEL</th>
-                            <th colspan="{{ $totalWeeks }}">NILAI MINGGUAN (%)</th>
-                            <th rowspan="2" style="width: 15%;">RATA-RATA BULANAN (%)</th>
-                            <th rowspan="2" style="width: 15%;">KETERANGAN (PENCAPAIAN)</th>
+                            <th rowspan="2" style="width: 20%;">NAMA DANRU</th>
+                            <th colspan="3">NILAI INDIKATOR (1-5)</th>
+                            <th rowspan="2" style="width: 10%; font-size: 8px;">RATA-RATA SKOR</th>
+                            <th rowspan="2" style="width: 10%; font-size: 8px;">PERSENTASE</th>
+                            <th rowspan="2" style="width: 15%;">KETERANGAN</th>
                         </tr>
                         <tr>
-                            @for($i = 1; $i <= $totalWeeks; $i++)
-                                <th>MINGGU {{ $i }}</th>
-                            @endfor
+                            <th style="width: 13%; font-size: 8px;">PENGAWASAN</th>
+                            <th style="width: 13%; font-size: 8px;">PELAPORAN</th>
+                            <th style="width: 14%; font-size: 8px;">PENYELESAIAN</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -108,10 +109,11 @@
                             @endphp
                             <tr>
                                 <td>{{ $index + 1 }}</td>
-                                <td class="text-left font-bold">{{ $person['nama_lengkap'] }} {!! $person['role'] === 'Danru' ? '<span style="color:red; font-size:6px;">(DANRU)</span>' : '' !!}</td>
-                                @for($i = 1; $i <= $totalWeeks; $i++)
-                                    <td>{{ isset($person['weekly_scores']['M'.$i]) ? round($person['weekly_scores']['M'.$i]) . '%' : '-' }}</td>
-                                @endfor
+                                <td class="text-left font-bold">{{ $person['nama_lengkap'] }}</td>
+                                <td>{{ isset($person['indicator_scores']['Pengawasan Personel']) ? $person['indicator_scores']['Pengawasan Personel'] : '-' }}</td>
+                                <td>{{ isset($person['indicator_scores']['Ketepatan Pelaporan']) ? $person['indicator_scores']['Ketepatan Pelaporan'] : '-' }}</td>
+                                <td>{{ isset($person['indicator_scores']['Penyelesaian Masalah']) ? $person['indicator_scores']['Penyelesaian Masalah'] : '-' }}</td>
+                                <td class="font-bold">{{ $person['avg_score'] !== null ? number_format($person['avg_score'], 1) : '-' }}</td>
                                 <td class="font-bold">{{ $person['avg_percentage'] !== null ? round($person['avg_percentage']) . '%' : '-' }}</td>
                                 @php
                                     $score = $person['avg_percentage'];
@@ -135,7 +137,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ $totalWeeks + 4 }}">Tidak ada data personel</td>
+                                <td colspan="8">Tidak ada data Danru</td>
                             </tr>
                         @endforelse
                         
@@ -145,7 +147,10 @@
                                 <tr>
                                     <td style="color: transparent;">{{ $i }}</td>
                                     <td></td>
-                                    @for($w = 1; $w <= $totalWeeks; $w++) <td></td> @endfor
+                                    <td></td>
+                                    <td></td>
+                                    <td></td>
+                                    <td></td>
                                     <td></td>
                                     <td></td>
                                 </tr>
@@ -154,7 +159,8 @@
                     </tbody>
                     <tfoot>
                         <tr style="background-color: #e2e8f0;">
-                            <th colspan="{{ $totalWeeks + 2 }}" class="text-right" style="padding-right: 15px; text-transform: uppercase;">RATA-RATA KESELURUHAN</th>
+                            <th colspan="5" class="text-right" style="padding-right: 15px; text-transform: uppercase;">RATA-RATA KESELURUHAN</th>
+                            <th>{{ $validPersonCount > 0 ? number_format($grandTotalScore / $validPersonCount / 100 * 5, 1) : '-' }}</th>
                             <th>{{ $validPersonCount > 0 ? round($grandTotalScore / $validPersonCount) . '%' : '-' }}</th>
                             <th></th>
                         </tr>

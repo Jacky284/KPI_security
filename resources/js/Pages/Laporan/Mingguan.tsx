@@ -4,6 +4,7 @@ import DashboardLayout from "@/Layouts/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SignaturePad } from "@/components/SignaturePad";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface DanruPembuat {
   id_user: number;
@@ -27,9 +28,9 @@ interface LaporanBulanan {
 interface Violation {
   id_catatan: number;
   kategori_indikator: string;
-  tingkat_pelanggaran: string;
-  tanggal_kejadian: string;
-  deskripsi_kejadian: string;
+  tingkat_penilaian: string;
+  tanggal_penilaian: string;
+  deskripsi_penilaian: string;
 }
 
 interface OfficerPerformance {
@@ -40,6 +41,8 @@ interface OfficerPerformance {
   total_score: number;
   percentage: number;
   violations: Violation[];
+  role?: string;
+  total_hari_kerja?: number;
 }
 
 interface LaporanMingguan {
@@ -102,6 +105,11 @@ export default function LaporanMingguan({
   currentUser,
 }: Props) {
   const [activeMingguanSignatures, setActiveMingguanSignatures] = useState<Record<number, string>>({});
+  const [collapsedSignatureRegus, setCollapsedSignatureRegus] = useState<Record<string, boolean>>({});
+
+  const toggleSignatureRegu = (regu: string) => {
+    setCollapsedSignatureRegus(prev => ({ ...prev, [regu]: !prev[regu] }));
+  };
 
   const listBulan = [
     "Januari", "Februari", "Maret", "April", "Mei", "Juni",
@@ -167,9 +175,23 @@ export default function LaporanMingguan({
   const currentWeekReport = laporanMingguan.find(r => r.minggu_ke === selectedMinggu);
   const canExportMingguan = currentWeekReport !== undefined;
 
-  const visibleLaporan = laporanMingguan.filter(r =>
-    r.status_dokumen !== "Draft" || ('is_signable' in r ? (r as any).is_signable !== false : true)
+  const visibleLaporan = laporanMingguan.filter(
+    (l) => l.bulan === selectedBulan && l.tahun === selectedTahun && l.is_signable !== false
   );
+
+  const groupedSignatures = React.useMemo(() => {
+    const groups: Record<string, typeof visibleLaporan> = {};
+    visibleLaporan.forEach((report) => {
+      const reguName = report.regu || "Tanpa Regu";
+      if (!groups[reguName]) groups[reguName] = [];
+      groups[reguName].push(report);
+    });
+    return Object.keys(groups).sort((a, b) => {
+      if (a === "Tanpa Regu") return 1;
+      if (b === "Tanpa Regu") return -1;
+      return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+    }).map(regu => ({ regu, reports: groups[regu] }));
+  }, [visibleLaporan]);
 
   return (
     <>
@@ -282,7 +304,12 @@ export default function LaporanMingguan({
                     performanceData.map((officer) => (
                       <tr key={officer.id_user} className="border-b align-top hover:bg-muted/5">
                         <td className="p-3 font-bold text-foreground">
-                          {officer.nama_lengkap}
+                          <div className="flex items-center gap-2">
+                            <span>{officer.nama_lengkap}</span>
+                            {officer.role === 'Danru' && (
+                              <span className="bg-destructive/15 text-destructive font-bold text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">Danru</span>
+                            )}
+                          </div>
                           {officer.violations.length > 0 && (
                             <div className="mt-1 text-[10px] text-destructive italic font-normal">
                               Ada {officer.violations.length} pelanggaran
@@ -291,7 +318,12 @@ export default function LaporanMingguan({
                         </td>
                         <td className="p-3 font-semibold whitespace-nowrap">{officer.regu}</td>
                         <td className="p-3 text-center">{officer.scores.Kedisiplinan ?? '-'}</td>
-                        <td className="p-3 text-center">{officer.scores.Kehadiran ?? '-'}</td>
+                        <td className="p-3 text-center">
+                          <div>{officer.scores.Kehadiran ?? '-'}</div>
+                          {officer.total_hari_kerja !== undefined && officer.total_hari_kerja > 0 && (
+                            <div className="text-[10px] text-muted-foreground whitespace-nowrap">({officer.total_hari_kerja} hari kerja)</div>
+                          )}
+                        </td>
                         <td className="p-3 text-center">{officer.scores.Kerapihan ?? '-'}</td>
                         <td className="p-3 text-center">{officer.scores.Komunikasi ?? '-'}</td>
                         <td className="p-3 text-center font-semibold">{officer.total_score ?? '-'}</td>
@@ -324,7 +356,12 @@ export default function LaporanMingguan({
                   <div key={officer.id_user} className="flex flex-col gap-3 p-4 border rounded-xl bg-card shadow-sm">
                     <div className="flex justify-between items-start border-b pb-2">
                       <div>
-                        <div className="font-bold text-foreground text-sm">{officer.nama_lengkap}</div>
+                        <div className="flex items-center gap-2">
+                          <div className="font-bold text-foreground text-sm">{officer.nama_lengkap}</div>
+                          {officer.role === 'Danru' && (
+                            <span className="bg-destructive/15 text-destructive font-bold text-[9px] px-1.5 py-0.5 rounded-full uppercase tracking-wider">Danru</span>
+                          )}
+                        </div>
                         {officer.violations.length > 0 && (
                           <div className="text-[10px] text-destructive italic font-normal mt-0.5">
                             Ada {officer.violations.length} pelanggaran
@@ -350,7 +387,12 @@ export default function LaporanMingguan({
                       </div>
                       <div className="flex flex-col bg-muted/30 p-2 rounded-lg border">
                         <span className="mb-1 truncate">Kehadiran</span>
-                        <span className="text-foreground text-xs">{officer.scores.Kehadiran ?? '-'}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-foreground text-xs">{officer.scores.Kehadiran ?? '-'}</span>
+                          {officer.total_hari_kerja !== undefined && officer.total_hari_kerja > 0 && (
+                            <span className="text-[9px] text-muted-foreground whitespace-nowrap">({officer.total_hari_kerja} hari kerja)</span>
+                          )}
+                        </div>
                       </div>
                       <div className="flex flex-col bg-muted/30 p-2 rounded-lg border">
                         <span className="mb-1 truncate">Kerapihan</span>
@@ -400,60 +442,74 @@ export default function LaporanMingguan({
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleLaporan.length > 0 ? (
-                    visibleLaporan.map((report) => {
-                      const isDraft = report.status_dokumen === "Draft";
-                      const isReviewChief = report.status_dokumen === "Review_Chief";
-                      const canDanruSign = currentUser.role === "Danru" && isDraft;
-                      const canChiefSign = currentUser.role === "Chief" && isReviewChief;
-                      const isSignable = 'is_signable' in report ? (report as any).is_signable !== false : true;
-
-                      return (
-                        <tr key={report.id_laporan_mingguan} className="border-b align-top hover:bg-muted/5">
-                          <td className="p-3 font-bold text-foreground">Minggu {report.minggu_ke}</td>
-                          <td className="p-3">{report.bulan} {report.tahun}</td>
-                          <td className="p-3 font-semibold whitespace-nowrap">{report.regu}</td>
-                          <td className="p-3">{report.danru?.nama_lengkap || "-"}</td>
-                          <td className="p-3">{getStatusBadge(report.status_dokumen)}</td>
-
-                          {/* Danru Signature */}
-                          <td className="p-3">
-                            {report.ttd_danru_url ? (
-                              <img src={report.ttd_danru_url} alt="TTD Danru" className="max-h-16 object-contain border rounded bg-white p-1" />
-                            ) : canDanruSign ? (
-                              isSignable ? (
-                                <div className="min-w-[180px]">
-                                  <SignaturePad
-                                    label="Tanda Tangan Danru"
-                                    onConfirm={(data) => handleSaveMingguanSignature(report.id_laporan_mingguan, data)}
-                                  />
-                                </div>
-                              ) : (
-                                <span className="text-xs text-muted-foreground italic font-semibold">(Terkunci hingga minggu berakhir)</span>
-                              )
-                            ) : (
-                              <span className="text-xs text-muted-foreground italic">Menunggu...</span>
-                            )}
-                          </td>
-
-                          {/* Chief Signature */}
-                          <td className="p-3">
-                            {report.ttd_chief_url ? (
-                              <img src={report.ttd_chief_url} alt="TTD Chief" className="max-h-16 object-contain border rounded bg-white p-1" />
-                            ) : canChiefSign ? (
-                              <div className="min-w-[180px]">
-                                <SignaturePad
-                                  label="Tanda Tangan Chief"
-                                  onConfirm={(data) => handleSaveMingguanSignature(report.id_laporan_mingguan, data)}
-                                />
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground italic">Menunggu...</span>
-                            )}
+                  {groupedSignatures.length > 0 ? (
+                    groupedSignatures.map((group) => (
+                      <React.Fragment key={group.regu}>
+                        <tr className="bg-muted/50 border-y">
+                          <td colSpan={7} className="py-2 px-3 font-bold text-left text-primary border-r shadow-sm">
+                            <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSignatureRegu(group.regu)}>
+                              <span>{group.regu}</span>
+                              <Button type="button" variant="ghost" size="icon" className="h-6 w-6 ml-2">
+                                {collapsedSignatureRegus[group.regu] ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                              </Button>
+                            </div>
                           </td>
                         </tr>
-                      );
-                    })
+                        {!collapsedSignatureRegus[group.regu] && group.reports.map((report) => {
+                          const isDraft = report.status_dokumen === "Draft";
+                          const isReviewChief = report.status_dokumen === "Review_Chief";
+                          const canDanruSign = currentUser.role === "Danru" && isDraft;
+                          const canChiefSign = currentUser.role === "Chief" && isReviewChief;
+                          const isSignable = 'is_signable' in report ? (report as any).is_signable !== false : true;
+
+                          return (
+                            <tr key={report.id_laporan_mingguan} className="border-b align-top hover:bg-muted/5">
+                              <td className="p-3 font-bold text-foreground">Minggu {report.minggu_ke}</td>
+                              <td className="p-3">{report.bulan} {report.tahun}</td>
+                              <td className="p-3 font-semibold whitespace-nowrap">{report.regu}</td>
+                              <td className="p-3">{report.danru?.nama_lengkap || "-"}</td>
+                              <td className="p-3">{getStatusBadge(report.status_dokumen)}</td>
+
+                              {/* Danru Signature */}
+                              <td className="p-3">
+                                {report.ttd_danru_url ? (
+                                  <img src={report.ttd_danru_url} alt="TTD Danru" className="max-h-16 object-contain border rounded bg-white p-1" />
+                                ) : canDanruSign ? (
+                                  isSignable ? (
+                                    <div className="min-w-[180px]">
+                                      <SignaturePad
+                                        label="Tanda Tangan Danru"
+                                        onConfirm={(data) => handleSaveMingguanSignature(report.id_laporan_mingguan, data)}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground italic font-semibold">(Terkunci hingga minggu berakhir)</span>
+                                  )
+                                ) : (
+                                  <span className="text-xs text-muted-foreground italic">Menunggu...</span>
+                                )}
+                              </td>
+
+                              {/* Chief Signature */}
+                              <td className="p-3">
+                                {report.ttd_chief_url ? (
+                                  <img src={report.ttd_chief_url} alt="TTD Chief" className="max-h-16 object-contain border rounded bg-white p-1" />
+                                ) : canChiefSign ? (
+                                  <div className="min-w-[180px]">
+                                    <SignaturePad
+                                      label="Tanda Tangan Chief"
+                                      onConfirm={(data) => handleSaveMingguanSignature(report.id_laporan_mingguan, data)}
+                                    />
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground italic">Menunggu...</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </React.Fragment>
+                    ))
                   ) : (
                     <tr>
                       <td colSpan={7} className="p-6 text-center text-muted-foreground italic">
@@ -467,71 +523,82 @@ export default function LaporanMingguan({
 
             {/* Mobile View */}
             <div className="lg:hidden flex flex-col gap-4 p-2">
-              {visibleLaporan.length > 0 ? (
-                visibleLaporan.map((report) => {
-                  const isDraft = report.status_dokumen === "Draft";
-                  const isReviewChief = report.status_dokumen === "Review_Chief";
-                  const canDanruSign = currentUser.role === "Danru" && isDraft;
-                  const canChiefSign = currentUser.role === "Chief" && isReviewChief;
-                  const isSignable = report.is_signable !== false;
-
-                  return (
-                    <div key={report.id_laporan_mingguan} className="flex flex-col gap-3 p-4 border rounded-xl bg-card shadow-sm">
-                      <div className="flex justify-between items-start border-b pb-3">
-                        <div>
-                          <div className="font-bold text-foreground text-sm">Minggu {report.minggu_ke}</div>
-                          <div className="text-xs text-muted-foreground">{report.bulan} {report.tahun}</div>
-                          <span className="inline-block mt-1 bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] font-bold uppercase">{report.regu}</span>
-                        </div>
-                        <div className="flex flex-col items-end gap-2">
-                          {getStatusBadge(report.status_dokumen)}
-                          <div className="text-[10px] text-muted-foreground">Oleh: {report.danru?.nama_lengkap || "-"}</div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-3 mt-1">
-                        {/* Danru Sign */}
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase">Tanda Tangan Danru</span>
-                          {report.ttd_danru_url ? (
-                            <img src={report.ttd_danru_url} alt="TTD Danru" className="max-h-16 object-contain border rounded bg-white p-1 self-start" />
-                          ) : canDanruSign ? (
-                            isSignable ? (
-                              <div className="w-full">
-                                <SignaturePad
-                                  label="Tanda Tangan Danru"
-                                  onConfirm={(data) => handleSaveMingguanSignature(report.id_laporan_mingguan, data)}
-                                />
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground italic font-semibold">(Terkunci hingga minggu berakhir)</span>
-                            )
-                          ) : (
-                            <span className="text-xs text-muted-foreground italic">Menunggu...</span>
-                          )}
-                        </div>
-
-                        {/* Chief Sign */}
-                        <div className="flex flex-col gap-1 border-t pt-2">
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase">Tanda Tangan Chief</span>
-                          {report.ttd_chief_url ? (
-                            <img src={report.ttd_chief_url} alt="TTD Chief" className="max-h-16 object-contain border rounded bg-white p-1 self-start" />
-                          ) : canChiefSign ? (
-                            <div className="w-full">
-                              <SignaturePad
-                                label="Tanda Tangan Chief"
-                                onConfirm={(data) => handleSaveMingguanSignature(report.id_laporan_mingguan, data)}
-                              />
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground italic">Menunggu...</span>
-                          )}
-                        </div>
-                      </div>
+              {groupedSignatures.length > 0 ? (
+                groupedSignatures.map((group) => (
+                  <div key={group.regu} className="flex flex-col gap-2">
+                    <div 
+                      className="flex justify-between items-center bg-muted p-3 rounded-lg font-bold text-primary cursor-pointer border shadow-sm"
+                      onClick={() => toggleSignatureRegu(group.regu)}
+                    >
+                      <span>{group.regu}</span>
+                      {collapsedSignatureRegus[group.regu] ? <ChevronDown className="h-5 w-5" /> : <ChevronUp className="h-5 w-5" />}
                     </div>
-                  );
-                })
+
+                    {!collapsedSignatureRegus[group.regu] && (
+                      <div className="flex flex-col gap-4">
+                        {group.reports.map((report) => {
+                          const isDraft = report.status_dokumen === "Draft";
+                          const isReviewChief = report.status_dokumen === "Review_Chief";
+                          const canDanruSign = currentUser.role === "Danru" && isDraft;
+                          const canChiefSign = currentUser.role === "Chief" && isReviewChief;
+                          const isSignable = 'is_signable' in report ? (report as any).is_signable !== false : true;
+
+                          return (
+                            <div key={report.id_laporan_mingguan} className="border p-4 rounded-lg bg-card shadow-sm flex flex-col gap-3">
+                              <div className="flex justify-between items-center border-b pb-2">
+                                <span className="font-bold text-foreground">Minggu {report.minggu_ke}</span>
+                                {getStatusBadge(report.status_dokumen)}
+                              </div>
+                              <div className="text-sm">
+                                <span className="text-muted-foreground">Periode:</span> <span className="font-medium">{report.bulan} {report.tahun}</span>
+                              </div>
+                              <div className="text-sm">
+                                <span className="text-muted-foreground">Regu:</span> <span className="font-medium">{report.regu}</span>
+                              </div>
+                              <div className="text-sm border-b pb-2">
+                                <span className="text-muted-foreground">Danru Pembuat:</span> <span className="font-medium">{report.danru?.nama_lengkap || "-"}</span>
+                              </div>
+                              
+                              <div className="flex flex-col gap-2">
+                                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tanda Tangan Danru</span>
+                                {report.ttd_danru_url ? (
+                                  <img src={report.ttd_danru_url} alt="TTD Danru" className="max-h-16 object-contain border rounded bg-white p-1 self-start" />
+                                ) : canDanruSign ? (
+                                  isSignable ? (
+                                    <SignaturePad
+                                      label="Tanda Tangan Danru"
+                                      onConfirm={(data) => handleSaveMingguanSignature(report.id_laporan_mingguan, data)}
+                                    />
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground italic font-semibold">(Terkunci hingga minggu berakhir)</span>
+                                  )
+                                ) : (
+                                  <span className="text-xs text-muted-foreground italic">Menunggu...</span>
+                                )}
+                              </div>
+                              
+                              <div className="flex flex-col gap-2 pt-2 border-t">
+                                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tanda Tangan Chief</span>
+                                {report.ttd_chief_url ? (
+                                  <img src={report.ttd_chief_url} alt="TTD Chief" className="max-h-16 object-contain border rounded bg-white p-1 self-start" />
+                                ) : canChiefSign ? (
+                                  <SignaturePad
+                                    label="Tanda Tangan Chief"
+                                    onConfirm={(data) => handleSaveMingguanSignature(report.id_laporan_mingguan, data)}
+                                  />
+                                ) : (
+                                  <span className="text-xs text-muted-foreground italic">Menunggu...</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))
               ) : (
-                <div className="p-8 text-center text-muted-foreground border rounded-xl border-dashed">
+                <div className="p-6 text-center text-muted-foreground border rounded-xl bg-card italic">
                   Belum ada laporan mingguan.
                 </div>
               )}

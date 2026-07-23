@@ -3,7 +3,7 @@ import { Head, router, useForm } from "@inertiajs/react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Undo, Redo } from "lucide-react";
 
 interface User {
   id_user: number;
@@ -45,6 +45,16 @@ export default function Manage({ anggotas, jadwals, bulan, tahun }: Props) {
     jadwal: {} as Record<number, Record<string, "Pagi" | "Malam" | "Libur">>,
   });
 
+  const [history, setHistory] = useState<Record<number, Record<string, "Pagi" | "Malam" | "Libur">>[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+
+  const pushToHistory = (newJadwal: Record<number, Record<string, "Pagi" | "Malam" | "Libur">>) => {
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(newJadwal);
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  };
+
   const [collapsedRegus, setCollapsedRegus] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -62,6 +72,8 @@ export default function Manage({ anggotas, jadwals, bulan, tahun }: Props) {
       tahun: selectedTahun,
       jadwal: initialJadwal
     }));
+    setHistory([initialJadwal]);
+    setHistoryIndex(0);
   }, [anggotas, jadwals, selectedBulan, selectedTahun]);
 
   const handleBulanChange = (newBulan: string) => {
@@ -145,10 +157,11 @@ export default function Manage({ anggotas, jadwals, bulan, tahun }: Props) {
       return;
     }
 
-    const newJadwal = { ...data.jadwal };
+    const newJadwal = JSON.parse(JSON.stringify(data.jadwal));
     const newVal = toggleShift(currentShift) as any;
     updateJadwalRecursive(newJadwal, anggota, day, newVal);
     setData("jadwal", newJadwal);
+    pushToHistory(newJadwal);
   };
 
   const applyFillPattern = () => {
@@ -168,7 +181,7 @@ export default function Manage({ anggotas, jadwals, bulan, tahun }: Props) {
     const targetMinCol = Math.min(minCol, dragFillTarget.col);
     const targetMaxCol = Math.max(maxCol, dragFillTarget.col);
 
-    const newJadwal = { ...data.jadwal };
+    const newJadwal = JSON.parse(JSON.stringify(data.jadwal));
 
     for (let r = targetMinRow; r <= targetMaxRow; r++) {
       for (let c = targetMinCol; c <= targetMaxCol; c++) {
@@ -199,12 +212,29 @@ export default function Manage({ anggotas, jadwals, bulan, tahun }: Props) {
     }
 
     setData("jadwal", newJadwal);
+    pushToHistory(newJadwal);
     
     // Expand selection to include filled area
     setSelection({
       start: { row: targetMinRow, col: targetMinCol },
       end: { row: targetMaxRow, col: targetMaxCol }
     });
+  };
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      setData("jadwal", history[newIndex]);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      setData("jadwal", history[newIndex]);
+    }
   };
 
   const isCellSelected = (row: number, col: number) => {
@@ -262,14 +292,14 @@ export default function Manage({ anggotas, jadwals, bulan, tahun }: Props) {
       currentRegu = reguDisplay;
       tableRows.push(
         <tr key={`regu-${currentRegu}`} className="bg-muted/50 border-y">
-          <td className="p-2 font-bold text-left sticky left-0 bg-muted z-30 text-primary border-r shadow-sm">
-            <div className="flex justify-between items-center h-full">
+          <td className="py-1 px-2 font-bold text-left sticky left-0 bg-muted z-30 text-primary border-r shadow-sm text-xs">
+            <div className="flex justify-between items-center">
               <span>{currentRegu}</span>
               <Button 
                 type="button"
                 variant="ghost" 
                 size="icon" 
-                className="h-6 w-6 ml-2"
+                className="h-5 w-5 ml-2"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -347,7 +377,7 @@ export default function Manage({ anggotas, jadwals, bulan, tahun }: Props) {
           <p className="text-sm text-muted-foreground">Atur jadwal shift anggota secara cepat menggunakan fitur Drag-and-Fill. Klik dan tahan sel, lalu tarik ujung kanannya untuk menyalin pola jadwal.</p>
         </div>
 
-        <Card className="shadow-xs border-2 overflow-hidden">
+        <Card className="shadow-xs border-2">
           <CardHeader className="bg-muted/30 border-b flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4">
             <div>
               <CardTitle className="text-md font-bold">Grid Jadwal</CardTitle>
@@ -373,9 +403,9 @@ export default function Manage({ anggotas, jadwals, bulan, tahun }: Props) {
               />
             </div>
           </CardHeader>
-          <form onSubmit={submit} className="flex flex-col relative h-full">
+          <form onSubmit={submit} className="flex flex-col">
             <CardContent className="p-0 overflow-x-auto select-none w-full max-w-[100vw]">
-              <div className="min-w-max lg:min-w-0 lg:w-full pb-4 lg:pb-0">
+              <div className="min-w-max lg:min-w-0 lg:w-full pb-4">
                 <table className="w-full text-xs text-center border-collapse table-auto lg:table-fixed">
                   <thead>
                     <tr className="bg-muted text-foreground border-b border-muted-foreground/20">
@@ -405,7 +435,12 @@ export default function Manage({ anggotas, jadwals, bulan, tahun }: Props) {
                 Tips: <b>Klik 1x</b> pada sel untuk mengubah Pagi/Malam/Libur secara cepat tanpa drag.
               </div>
               <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => router.reload()}>Batal</Button>
+                <Button type="button" variant="outline" size="icon" onClick={handleUndo} disabled={historyIndex <= 0} title="Undo">
+                  <Undo className="w-4 h-4" />
+                </Button>
+                <Button type="button" variant="outline" size="icon" onClick={handleRedo} disabled={historyIndex >= history.length - 1} title="Redo">
+                  <Redo className="w-4 h-4" />
+                </Button>
                 <Button type="submit" disabled={processing || anggotas.length === 0}>
                   {processing ? "Menyimpan..." : "Simpan Jadwal"}
                 </Button>

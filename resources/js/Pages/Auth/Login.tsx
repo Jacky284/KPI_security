@@ -22,9 +22,8 @@ export default function Login() {
       <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
         <div className="w-full max-w-md space-y-8">
           <div className="flex flex-col items-center">
-            {/* Sturdy Military/Security Styled Shield Icon */}
-            <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-md font-bold text-2xl">
-              PMS
+            <div className="flex h-28 w-28 items-center justify-center mb-2">
+              <img src="/images/logo-login.png" alt="KPI Security Logo" className="object-contain w-full h-full" />
             </div>
             <h2 className="mt-6 text-center text-2xl font-black tracking-tight text-foreground uppercase">
               Sistem PMS Security

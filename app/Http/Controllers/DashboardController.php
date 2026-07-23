@@ -208,14 +208,14 @@ class DashboardController extends Controller
 
                     foreach ($violationsThisMonth as $v) {
                         $deduction = 5;
-                        if ($v->tingkat_pelanggaran === 'Sedang') $deduction = 10;
-                        if ($v->tingkat_pelanggaran === 'Berat') $deduction = 25;
+                        if ($v->tingkat_penilaian === 'Sedang') $deduction = 10;
+                        if ($v->tingkat_penilaian === 'Berat') $deduction = 25;
                         
                         $idAcc = $v->id_anggota;
                         if (isset($anggotaNames[$idAcc])) {
                             $shift = 'Libur';
                             if (isset($jadwalsThatMonth[$idAcc]) && is_array($jadwalsThatMonth[$idAcc]->jadwal_harian)) {
-                                $day = \Carbon\Carbon::parse($v->tanggal_kejadian)->format('j');
+                                $day = \Carbon\Carbon::parse($v->tanggal_penilaian)->format('j');
                                 $dailyShift = $jadwalsThatMonth[$idAcc]->jadwal_harian[$day] ?? 'Libur';
                                 $lowerD = strtolower((string)$dailyShift);
                                 if (strpos($lowerD, 'malam') !== false) {

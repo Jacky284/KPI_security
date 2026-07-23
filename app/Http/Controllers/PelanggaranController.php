@@ -23,20 +23,31 @@ class PelanggaranController extends Controller
         if (strtolower(trim($user->role)) === 'danru') {
             $query->where('role', 'Anggota')->where('regu', trim($user->regu));
         } elseif (strtolower(trim($user->role)) === 'chief') {
-            // Chief evaluates Danru
             $query->where('role', 'Danru');
         } else {
             // Admin can see both
             $query->whereIn('role', ['Anggota', 'Danru']);
         }
 
-        $anggota = $query->get(['id_user', 'nama_lengkap', 'regu']);
+        $anggota = $query->get(['id_user', 'nama_lengkap', 'regu', 'role'])->sort(function($a, $b) {
+            $aRegu = $a->regu ?: 'Z';
+            $bRegu = $b->regu ?: 'Z';
+            $reguCompare = strnatcasecmp($aRegu, $bRegu);
+            if ($reguCompare === 0) {
+                $isADanru = $a->role === 'Danru' ? 0 : 1;
+                $isBDanru = $b->role === 'Danru' ? 0 : 1;
+                if ($isADanru !== $isBDanru) return $isADanru - $isBDanru;
+                return strnatcasecmp($a->nama_lengkap, $b->nama_lengkap);
+            }
+            return $reguCompare;
+        })->values();
 
         $jadwals = \App\Models\JadwalBulanan::whereIn('id_anggota', $anggota->pluck('id_user'))->get();
 
         return Inertia::render('Pelanggaran/InputPelanggaran', [
             'anggota' => $anggota,
             'jadwals' => $jadwals,
+            'userRole' => $user->role,
         ]);
     }
 
@@ -49,13 +60,13 @@ class PelanggaranController extends Controller
 
         $validated = $request->validate([
             'id_anggota' => 'required|exists:users,id_user',
-            'tanggal_kejadian' => 'required|date',
+            'tanggal_penilaian' => 'required|date',
             'minggu_ke' => 'required|integer|min:1|max:6',
             'bulan' => 'required|string|max:20',
             'tahun' => 'required|integer|min:2020|max:2100',
-            'kategori_indikator' => 'required|in:Kedisiplinan,Kehadiran,Kerapihan,Komunikasi',
-            'tingkat_pelanggaran' => 'required|in:Ringan,Sedang,Berat',
-            'deskripsi_kejadian' => 'required|string',
+            'kategori_indikator' => 'required|string',
+            'tingkat_penilaian' => 'required|string',
+            'deskripsi_penilaian' => 'required|string',
         ]);
 
         if (strtolower(trim($user->role)) === 'danru') {
@@ -70,16 +81,28 @@ class PelanggaranController extends Controller
             }
         }
 
+        // Cek agar maksimal 1 penilaian per kategori per anggota dalam 1 minggu
+        $existing = CatatanPelanggaran::where('id_anggota', $validated['id_anggota'])
+            ->where('kategori_indikator', $validated['kategori_indikator'])
+            ->where('minggu_ke', $validated['minggu_ke'])
+            ->where('tahun', $validated['tahun'])
+            ->where('bulan', $validated['bulan'])
+            ->first();
+
+        if ($existing) {
+            return redirect()->back()->withErrors(['kategori_indikator' => 'Anggota ini sudah memiliki penilaian untuk kategori ini pada minggu tersebut.']);
+        }
+
         CatatanPelanggaran::create([
             'id_anggota' => $validated['id_anggota'],
             'id_penilai' => $user->id_user,
-            'tanggal_kejadian' => $validated['tanggal_kejadian'],
+            'tanggal_penilaian' => $validated['tanggal_penilaian'],
             'minggu_ke' => $validated['minggu_ke'],
             'bulan' => $validated['bulan'],
             'tahun' => $validated['tahun'],
             'kategori_indikator' => $validated['kategori_indikator'],
-            'tingkat_pelanggaran' => $validated['tingkat_pelanggaran'],
-            'deskripsi_kejadian' => $validated['deskripsi_kejadian'],
+            'tingkat_penilaian' => $validated['tingkat_penilaian'],
+            'deskripsi_penilaian' => $validated['deskripsi_penilaian'],
         ]);
 
         return redirect()->back()->with('success', 'Catatan pelanggaran berhasil disimpan!');
@@ -104,7 +127,7 @@ class PelanggaranController extends Controller
         $minggu_ke = (int)$request->input('minggu_ke', $defaultMingguKe);
         $filter_regu = $request->input('filter_regu');
 
-        $query = CatatanPelanggaran::with(['anggota:id_user,nama_lengkap,regu', 'danruPenilai:id_user,nama_lengkap'])
+        $query = CatatanPelanggaran::with(['anggota:id_user,nama_lengkap,regu,role', 'danruPenilai:id_user,nama_lengkap'])
             ->where('bulan', $bulan)
             ->where('tahun', $tahun)
             ->where('minggu_ke', $minggu_ke);
@@ -113,13 +136,18 @@ class PelanggaranController extends Controller
             $query->whereHas('anggota', function ($q) use ($user) {
                 $q->where('regu', trim($user->regu));
             });
-        } else if ((strtolower(trim($user->role)) === 'chief' || strtolower(trim($user->role)) === 'admin') && $filter_regu) {
-            $query->whereHas('anggota', function ($q) use ($filter_regu) {
-                $q->where('regu', $filter_regu);
+        } else if (strtolower(trim($user->role)) === 'chief' || strtolower(trim($user->role)) === 'admin') {
+            $query->whereHas('anggota', function ($q) {
+                $q->whereIn('role', ['Anggota', 'Danru']);
             });
+            if ($filter_regu) {
+                $query->whereHas('anggota', function ($q) use ($filter_regu) {
+                    $q->where('regu', $filter_regu);
+                });
+            }
         }
 
-        $pelanggaran = $query->orderBy('tanggal_kejadian', 'desc')->get();
+        $pelanggaran = $query->orderBy('tanggal_penilaian', 'desc')->get();
 
         $reguList = \App\Models\Regu::orderBy('nama_regu', 'asc')->pluck('nama_regu')->values();
 
@@ -137,8 +165,8 @@ class PelanggaranController extends Controller
     public function updateTindakLanjut(Request $request, $id)
     {
         $user = Auth::user();
-        if (!in_array($user?->role, ['Admin', 'Chief'])) {
-            abort(403, 'Akses ditolak. Hanya Admin atau Chief Security yang dapat menandai tindak lanjut.');
+        if (!in_array($user?->role, ['Admin', 'Chief', 'Danru'])) {
+            abort(403, 'Akses ditolak. Hanya Admin, Chief, atau Danru yang dapat menandai tindak lanjut.');
         }
 
         $validated = $request->validate([
@@ -171,13 +199,22 @@ class PelanggaranController extends Controller
             $query->whereHas('anggota', function ($q) use ($user) {
                 $q->where('regu', trim($user->regu));
             });
-        } else if ((strtolower(trim($user->role)) === 'chief' || strtolower(trim($user->role)) === 'admin') && $filter_regu) {
+        } else if (strtolower(trim($user->role)) === 'chief') {
+            $query->whereHas('anggota', function ($q) {
+                $q->where('role', 'Danru');
+            });
+            if ($filter_regu) {
+                $query->whereHas('anggota', function ($q) use ($filter_regu) {
+                    $q->where('regu', $filter_regu);
+                });
+            }
+        } else if (strtolower(trim($user->role)) === 'admin' && $filter_regu) {
             $query->whereHas('anggota', function ($q) use ($filter_regu) {
                 $q->where('regu', $filter_regu);
             });
         }
 
-        $pelanggaran = $query->orderBy('tanggal_kejadian', 'desc')->get();
+        $pelanggaran = $query->orderBy('tanggal_penilaian', 'desc')->get();
 
         if ($type === 'excel') {
             return \Maatwebsite\Excel\Facades\Excel::download(

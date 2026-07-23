@@ -89,8 +89,14 @@ export const sidebarItems: NavGroup[] = [
         icon: Calendar,
       },
       {
+        id: "catatan-harian",
+        title: "Catatan Harian",
+        url: "/catatan-harian",
+        icon: Kanban,
+      },
+      {
         id: "input-pelanggaran",
-        title: "Input Pelanggaran",
+        title: "Input Penilaian",
         url: "/pelanggaran",
         icon: ListTodo,
       },
@@ -102,7 +108,7 @@ export const sidebarItems: NavGroup[] = [
     items: [
       {
         id: "daftar-pelanggaran",
-        title: "Daftar Pelanggaran",
+        title: "Daftar Penilaian",
         url: "/pelanggaran/daftar",
         icon: CheckSquare,
       },

@@ -61,20 +61,20 @@
                 @foreach($pelanggaran as $index => $item)
                 <tr>
                     <td>{{ $index + 1 }}</td>
-                    <td>{{ \Carbon\Carbon::parse($item->tanggal_kejadian)->format('d-m-Y') }}</td>
+                    <td>{{ \Carbon\Carbon::parse($item->tanggal_penilaian)->format('d-m-Y') }}</td>
                     <td class="text-left font-bold">{{ $item->anggota ? $item->anggota->nama_lengkap : '-' }}</td>
                     <td>{{ $item->anggota ? $item->anggota->regu : '-' }}</td>
                     <td>{{ $item->kategori_indikator }}</td>
                     <td>
-                        @if($item->tingkat_pelanggaran === 'Berat')
+                        @if($item->tingkat_penilaian === 'Berat')
                             <span class="badge-berat">BERAT</span>
-                        @elseif($item->tingkat_pelanggaran === 'Sedang')
+                        @elseif($item->tingkat_penilaian === 'Sedang')
                             <span class="badge-sedang">SEDANG</span>
                         @else
                             <span class="badge-ringan">RINGAN</span>
                         @endif
                     </td>
-                    <td class="text-left">{{ $item->deskripsi_kejadian }}</td>
+                    <td class="text-left">{{ $item->deskripsi_penilaian }}</td>
                     <td class="text-left">{{ $item->danruPenilai ? $item->danruPenilai->nama_lengkap : '-' }}</td>
                     <td class="font-bold">{{ $item->status_tindak_lanjut === 'Sudah' ? 'SUDAH' : 'BELUM' }}</td>
                 </tr>

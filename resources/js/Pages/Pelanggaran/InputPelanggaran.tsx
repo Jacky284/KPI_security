@@ -8,6 +8,7 @@ interface Anggota {
   id_user: number;
   nama_lengkap: string;
   regu: string;
+  role?: string;
 }
 
 interface JadwalBulanan {
@@ -21,9 +22,10 @@ interface JadwalBulanan {
 interface Props {
   anggota: Anggota[];
   jadwals: JadwalBulanan[];
+  userRole?: string;
 }
 
-export default function InputPelanggaran({ anggota, jadwals }: Props) {
+export default function InputPelanggaran({ anggota, jadwals, userRole }: Props) {
   const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const initialAnggotaId = urlParams ? urlParams.get("id_anggota") || "" : "";
 
@@ -79,14 +81,36 @@ export default function InputPelanggaran({ anggota, jadwals }: Props) {
 
   const { data, setData, post, processing, errors, reset, wasSuccessful } = useForm({
     id_anggota: initialAnggotaId,
-    tanggal_kejadian: todayStr,
+    tanggal_penilaian: todayStr,
     minggu_ke: initialWeekDetails.minggu_ke,
     bulan: initialWeekDetails.bulan,
     tahun: initialWeekDetails.tahun,
-    kategori_indikator: "Kedisiplinan",
-    tingkat_pelanggaran: "Ringan",
-    deskripsi_kejadian: "",
+    kategori_indikator: userRole === "Chief" ? "Pengawasan Personel" : "Disiplin Kerja",
+    tingkat_penilaian: userRole === "Chief" ? "Skor 4" : "Ringan 1 kali",
+    deskripsi_penilaian: "",
   });
+
+  const categories = userRole === "Chief" 
+    ? ["Pengawasan Personel", "Ketepatan Pelaporan", "Penyelesaian Masalah"]
+    : [
+        "Disiplin Kerja",
+        "Penampilan & Kerapihan",
+        "Kehadiran",
+        "Komunikasi & Pelayanan"
+      ];
+
+  const tingkatOptions: Record<string, string[]> = userRole === "Chief"
+    ? {
+        "Pengawasan Personel": ["Skor 4", "Skor 3", "Skor 2", "Skor 1"],
+        "Ketepatan Pelaporan": ["Skor 4", "Skor 3", "Skor 2", "Skor 1"],
+        "Penyelesaian Masalah": ["Skor 4", "Skor 3", "Skor 2", "Skor 1"],
+      }
+    : {
+        "Disiplin Kerja": ["Ringan 1 kali", "Ringan 2 kali", "Sedang", "Berat"],
+        "Penampilan & Kerapihan": ["Kurang rapi 1 kali", "Kurang rapi 2 kali", "Seragam tidak lengkap", "Penampilan tidak sesuai Standar"],
+        "Kehadiran": ["Terlambat 1 kali", "Terlambat 2 kali", "Tidak hadir dengan izin", "Mangkir / Alpha"],
+        "Komunikasi & Pelayanan": ["Komplain ringan", "Komplain sedang", "Sering mendapat teguran", "Komplain berat"],
+      };
 
   const getAvailableWeeks = (bulanStr: string, tahun: number) => {
     return [1, 2, 3, 4];
@@ -96,15 +120,15 @@ export default function InputPelanggaran({ anggota, jadwals }: Props) {
 
   const handleDateChange = (dateStr: string) => {
     if (!dateStr) {
-      setData("tanggal_kejadian", dateStr);
+      setData("tanggal_penilaian", dateStr);
       return;
     }
-    
+
     const weekDetails = calculateWeekNumber(dateStr);
 
     setData({
       ...data,
-      tanggal_kejadian: dateStr,
+      tanggal_penilaian: dateStr,
       tahun: weekDetails.tahun,
       bulan: weekDetails.bulan,
       minggu_ke: weekDetails.minggu_ke
@@ -115,7 +139,7 @@ export default function InputPelanggaran({ anggota, jadwals }: Props) {
     e.preventDefault();
     post("/pelanggaran", {
       onSuccess: () => {
-        reset("deskripsi_kejadian", "id_anggota");
+        reset("deskripsi_penilaian", "id_anggota");
         alert("Catatan pelanggaran berhasil disimpan!");
       },
     });
@@ -132,8 +156,8 @@ export default function InputPelanggaran({ anggota, jadwals }: Props) {
 
   // Calculate Shift based on selected user and date
   let shiftName = "-";
-  if (data.id_anggota && data.tanggal_kejadian) {
-    const dateObj = new Date(data.tanggal_kejadian);
+  if (data.id_anggota && data.tanggal_penilaian) {
+    const dateObj = new Date(data.tanggal_penilaian);
     const day = dateObj.getDate().toString();
     const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
     const year = dateObj.getFullYear();
@@ -153,28 +177,32 @@ export default function InputPelanggaran({ anggota, jadwals }: Props) {
 
   return (
     <>
-      <Head title="Input Pelanggaran" />
-      <div className="flex flex-col gap-6 max-w-2xl mx-auto">
+      <Head title="Input Penilaian" />
+      <div className="flex flex-col gap-6 max-w-7xl mx-auto">
         <div>
-          <h1 className="text-2xl font-bold text-primary tracking-tight">Input Catatan Pelanggaran Sekuriti</h1>
-          <p className="text-sm text-muted-foreground">Gunakan formulir ini untuk mencatat pelanggaran kinerja anggota sekuriti demi perhitungan KPI bulanan.</p>
+          <h1 className="text-2xl font-bold text-primary tracking-tight">Input Catatan Penilaian Sekuriti</h1>
+          <p className="text-sm text-muted-foreground mt-1">Gunakan formulir ini untuk mencatat penilaian kinerja anggota sekuriti demi perhitungan KPI bulanan.</p>
         </div>
         <Card className="shadow-md">
           <CardContent className="pt-6">
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               {/* Anggota Dropdown */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-semibold text-foreground">Pilih Personel (Anggota / Danru)</label>
+                <label className="text-sm font-semibold text-foreground">
+                  {userRole === "Chief" || userRole === "Admin" ? "Pilih Danru" : "Pilih Anggota"}
+                </label>
                 <select
                   value={data.id_anggota}
                   onChange={(e) => setData("id_anggota", e.target.value)}
                   className="w-full p-2.5 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                   required
                 >
-                  <option value="">-- Pilih Anggota --</option>
+                  <option value="">
+                    {userRole === "Chief" || userRole === "Admin" ? "-- Pilih Danru --" : "-- Pilih Anggota --"}
+                  </option>
                   {anggota.map((person) => (
                     <option key={person.id_user} value={person.id_user}>
-                      {person.nama_lengkap} ({person.regu || "Tanpa Regu"})
+                      {person.nama_lengkap} {person.role === 'Danru' ? '(DANRU)' : ''} - {person.regu || "-"}
                     </option>
                   ))}
                 </select>
@@ -182,17 +210,17 @@ export default function InputPelanggaran({ anggota, jadwals }: Props) {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Tanggal Kejadian */}
+                {/* Tanggal Penilaian */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-semibold text-foreground">Tanggal Kejadian</label>
+                  <label className="text-sm font-semibold text-foreground">Tanggal Penilaian</label>
                   <input
                     type="date"
-                    value={data.tanggal_kejadian}
+                    value={data.tanggal_penilaian}
                     onChange={(e) => handleDateChange(e.target.value)}
                     className="w-full p-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                     required
                   />
-                  {errors.tanggal_kejadian && <span className="text-xs text-destructive">{errors.tanggal_kejadian}</span>}
+                  {errors.tanggal_penilaian && <span className="text-xs text-destructive">{errors.tanggal_penilaian}</span>}
                   <span className="text-xs text-muted-foreground/80 italic font-medium ml-1">
                     Periode: Minggu Ke-{data.minggu_ke}, {data.bulan} {data.tahun}
                   </span>
@@ -227,46 +255,53 @@ export default function InputPelanggaran({ anggota, jadwals }: Props) {
                   <label className="text-sm font-semibold text-foreground">Kategori Indikator</label>
                   <select
                     value={data.kategori_indikator}
-                    onChange={(e) => setData("kategori_indikator", e.target.value)}
+                    onChange={(e) => {
+                      const newCat = e.target.value;
+                      setData({
+                        ...data,
+                        kategori_indikator: newCat,
+                        tingkat_penilaian: tingkatOptions[newCat][0]
+                      });
+                    }}
                     className="w-full p-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                     required
                   >
-                    {["Kedisiplinan", "Kehadiran", "Kerapihan", "Komunikasi"].map((cat) => (
+                    {categories.map((cat) => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
                   {errors.kategori_indikator && <span className="text-xs text-destructive">{errors.kategori_indikator}</span>}
                 </div>
 
-                {/* Tingkat Pelanggaran */}
+                {/* Tingkat Penilaian */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-semibold text-foreground">Tingkat Pelanggaran</label>
+                  <label className="text-sm font-semibold text-foreground">Tingkat Penilaian</label>
                   <select
-                    value={data.tingkat_pelanggaran}
-                    onChange={(e) => setData("tingkat_pelanggaran", e.target.value)}
+                    value={data.tingkat_penilaian}
+                    onChange={(e) => setData("tingkat_penilaian", e.target.value)}
                     className="w-full p-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                     required
                   >
-                    {["Ringan", "Sedang", "Berat"].map((lvl) => (
+                    {tingkatOptions[data.kategori_indikator]?.map((lvl) => (
                       <option key={lvl} value={lvl}>{lvl}</option>
                     ))}
                   </select>
-                  {errors.tingkat_pelanggaran && <span className="text-xs text-destructive">{errors.tingkat_pelanggaran}</span>}
+                  {errors.tingkat_penilaian && <span className="text-xs text-destructive">{errors.tingkat_penilaian}</span>}
                 </div>
               </div>
 
-              {/* Deskripsi Kejadian */}
+              {/* Deskripsi Penilaian */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-semibold text-foreground">Deskripsi Kejadian</label>
+                <label className="text-sm font-semibold text-foreground">Deskripsi Penilaian</label>
                 <textarea
-                  value={data.deskripsi_kejadian}
-                  onChange={(e) => setData("deskripsi_kejadian", e.target.value)}
+                  value={data.deskripsi_penilaian}
+                  onChange={(e) => setData("deskripsi_penilaian", e.target.value)}
                   rows={4}
                   placeholder="Ceritakan kejadian pelanggaran secara rinci..."
                   className="w-full p-2.5 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
                   required
                 />
-                {errors.deskripsi_kejadian && <span className="text-xs text-destructive">{errors.deskripsi_kejadian}</span>}
+                {errors.deskripsi_penilaian && <span className="text-xs text-destructive">{errors.deskripsi_penilaian}</span>}
               </div>
 
               {/* Submit Button */}

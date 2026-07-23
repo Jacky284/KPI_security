@@ -27,12 +27,18 @@ Route::middleware('auth')->group(function () {
     // Anggota Routes
     Route::get('/anggota', [AnggotaController::class, 'index']);
     Route::get('/anggota/{id}', [AnggotaController::class, 'show']);
+    Route::put('/anggota/{id}/pindah-regu', [AnggotaController::class, 'pindahRegu']);
 
     // Pelanggaran (Violation logging)
     Route::get('/pelanggaran', [PelanggaranController::class, 'create']);
     Route::post('/pelanggaran', [PelanggaranController::class, 'store']);
     Route::get('/pelanggaran/daftar', [PelanggaranController::class, 'index']);
     Route::patch('/pelanggaran/{id}/tindak-lanjut', [PelanggaranController::class, 'updateTindakLanjut']);
+
+    // Catatan Harian (Daily notes for Danru)
+    Route::get('/catatan-harian', [\App\Http\Controllers\CatatanHarianController::class, 'index'])->name('catatan-harian.index');
+    Route::post('/catatan-harian', [\App\Http\Controllers\CatatanHarianController::class, 'store'])->name('catatan-harian.store');
+    Route::patch('/catatan-harian/{id}/tindak-lanjut', [\App\Http\Controllers\CatatanHarianController::class, 'updateTindakLanjut'])->name('catatan-harian.update-tindak-lanjut');
 
     // Laporan (Monthly & Weekly reports & workflow)
     Route::get('/laporan/mingguan', [LaporanController::class, 'mingguan']);

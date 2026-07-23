@@ -15,27 +15,44 @@ class LaporanController extends Controller
     private function getDetailedMonthlyData($bulan, $tahun, $filter_regu = null)
     {
         $user = Auth::user();
-        $anggotaQuery = User::where('role', 'Anggota')->where('status_aktif', 1);
+        $anggotaQuery = User::where('status_aktif', 1);
         if (strtolower(trim($user->role)) === 'danru') {
-            $anggotaQuery->where('regu', trim($user->regu));
-        } else if ((strtolower(trim($user->role)) === 'chief' || strtolower(trim($user->role)) === 'admin') && $filter_regu) {
-            $anggotaQuery->where('regu', $filter_regu);
+            $anggotaQuery->where('role', 'Anggota')->where('regu', trim($user->regu));
+        } else if (strtolower(trim($user->role)) === 'chief' || strtolower(trim($user->role)) === 'admin') {
+            $anggotaQuery->where('role', 'Anggota');
+            if ($filter_regu) {
+                $anggotaQuery->where('regu', $filter_regu);
+            }
+        } else {
+            $anggotaQuery->where('role', 'Anggota');
         }
-        $anggotaList = $anggotaQuery->get();
-        $indicators = ['Kedisiplinan', 'Kehadiran', 'Kerapihan', 'Komunikasi'];
+
+        $anggotaList = $anggotaQuery->get()->sort(function($a, $b) {
+            $aRegu = $a->regu ?: 'Z';
+            $bRegu = $b->regu ?: 'Z';
+            $reguCompare = strnatcasecmp($aRegu, $bRegu);
+            if ($reguCompare === 0) {
+                $isADanru = $a->role === 'Danru' ? 0 : 1;
+                $isBDanru = $b->role === 'Danru' ? 0 : 1;
+                if ($isADanru !== $isBDanru) return $isADanru - $isBDanru;
+                return strnatcasecmp($a->nama_lengkap, $b->nama_lengkap);
+            }
+            return $reguCompare;
+        })->values();
+        $indicators = ['Disiplin Kerja', 'Kehadiran', 'Penampilan & Kerapihan', 'Komunikasi & Pelayanan'];
         $targets = [
-            'Kedisiplinan' => 90,
+            'Disiplin Kerja' => 90,
             'Kehadiran' => 100,
-            'Kerapihan' => 100,
-            'Komunikasi' => 85,
+            'Penampilan & Kerapihan' => 100,
+            'Komunikasi & Pelayanan' => 85,
         ];
 
         $perPerson = [];
         $indicatorTotals = [
-            'Kedisiplinan' => ['total' => 0, 'max' => 0],
+            'Disiplin Kerja' => ['total' => 0, 'max' => 0],
             'Kehadiran' => ['total' => 0, 'max' => 0],
-            'Kerapihan' => ['total' => 0, 'max' => 0],
-            'Komunikasi' => ['total' => 0, 'max' => 0],
+            'Penampilan & Kerapihan' => ['total' => 0, 'max' => 0],
+            'Komunikasi & Pelayanan' => ['total' => 0, 'max' => 0],
         ];
 
         $allViolations = CatatanPelanggaran::whereIn('id_anggota', $anggotaList->pluck('id_user'))
@@ -44,10 +61,38 @@ class LaporanController extends Controller
             ->get();
 
         $bulanNum = str_pad($this->parseBulanToNumber($bulan), 2, '0', STR_PAD_LEFT);
-        $firstDayOfMonth = \Carbon\Carbon::createFromDate($tahun, $bulanNum, 1);
-        $daysInMonth = $firstDayOfMonth->daysInMonth;
-        $firstDay = $firstDayOfMonth->dayOfWeekIso; // 1 (Mon) - 7 (Sun)
-        $totalWeeks = (int) ceil(($daysInMonth + $firstDay - 1) / 7);
+        $firstOfMonth = \Carbon\Carbon::createFromDate($tahun, $bulanNum, 1)->startOfDay();
+        $daysInMonth = $firstOfMonth->daysInMonth;
+        $dayOfWeek = $firstOfMonth->dayOfWeek; // 0 (Sun) - 6 (Sat)
+        
+        $startOfWeek1 = clone $firstOfMonth;
+        if ($dayOfWeek === 6) {
+            // same
+        } else if ($dayOfWeek === 0 || $dayOfWeek === 1 || $dayOfWeek === 2) {
+            $daysToSubtract = $dayOfWeek + 1;
+            $startOfWeek1->subDays($daysToSubtract);
+        } else {
+            $daysToAdd = 6 - $dayOfWeek;
+            $startOfWeek1->addDays($daysToAdd);
+        }
+        
+        $dayToWeekMap = [];
+        for ($d = 1; $d <= $daysInMonth; $d++) {
+            $targetDate = clone $firstOfMonth;
+            $targetDate->day($d);
+            
+            $weekNum = 1;
+            if ($targetDate->gte($startOfWeek1)) {
+                $diffDays = $startOfWeek1->diffInDays($targetDate);
+                $weekNum = (int)floor($diffDays / 7) + 1;
+            }
+            if ($weekNum > 4) $weekNum = 4;
+            if ($weekNum < 1) $weekNum = 1;
+            
+            $dayToWeekMap[$d] = (int)$weekNum;
+        }
+
+        $totalWeeks = 4;
 
         $jadwals = JadwalBulanan::whereIn('id_anggota', $anggotaList->pluck('id_user'))
             ->where('bulan', str_pad($this->parseBulanToNumber($bulan), 2, '0', STR_PAD_LEFT))
@@ -61,19 +106,17 @@ class LaporanController extends Controller
             $jadwalHarian = isset($jadwals[$officer->id_user]) ? $jadwals[$officer->id_user]->jadwal_harian : [];
 
             for ($m = 1; $m <= $totalWeeks; $m++) {
-                $startDayOfWeek = ($m - 1) * 7 - $firstDay + 2;
-                $endDayOfWeek = $m * 7 - $firstDay + 1;
-                $startDayOfWeek = max(1, $startDayOfWeek);
-                $endDayOfWeek = min($daysInMonth, $endDayOfWeek);
-
                 $passedWorkingDays = 0;
                 $hasSchedule = false;
-                for ($d = $startDayOfWeek; $d <= $endDayOfWeek; $d++) {
+                
+                for ($d = 1; $d <= $daysInMonth; $d++) {
+                    if ($dayToWeekMap[$d] !== $m) continue;
+
                     $shiftDay = isset($jadwalHarian[$d]) ? $jadwalHarian[$d] : null;
                     if ($shiftDay) {
                         $hasSchedule = true;
                         if ($shiftDay !== 'Libur') {
-                            $dateOfD = clone $firstDayOfMonth;
+                            $dateOfD = clone $firstOfMonth;
                             $dateOfD->day($d)->startOfDay();
                             if (\Carbon\Carbon::now()->gte($dateOfD)) {
                                 $passedWorkingDays++;
@@ -84,19 +127,24 @@ class LaporanController extends Controller
 
                 $totalWeekScore = 0;
                 foreach ($indicators as $ind) {
-                    $violationsForInd = $allViolations->where('id_anggota', $officer->id_user)
+                    $violation = $allViolations->where('id_anggota', $officer->id_user)
                         ->where('minggu_ke', $m)
-                        ->where('kategori_indikator', $ind);
-                    
-                    $ringan = $violationsForInd->where('tingkat_pelanggaran', 'Ringan')->count();
-                    $sedang = $violationsForInd->where('tingkat_pelanggaran', 'Sedang')->count();
-                    $berat = $violationsForInd->where('tingkat_pelanggaran', 'Berat')->count();
+                        ->where('kategori_indikator', $ind)
+                        ->first();
 
                     $score = 5;
-                    if ($berat >= 1) $score = 1;
-                    elseif ($sedang >= 1) $score = 2;
-                    elseif ($ringan >= 2) $score = 3;
-                    elseif ($ringan == 1) $score = 4;
+                    if ($violation) {
+                        $tingkat = $violation->tingkat_penilaian;
+                        if (in_array($tingkat, ['Ringan 1 kali', 'Kurang rapi 1 kali', 'Terlambat 1 kali', 'Komplain ringan'])) {
+                            $score = 4;
+                        } elseif (in_array($tingkat, ['Ringan 2 kali', 'Kurang rapi 2 kali', 'Terlambat 2 kali', 'Komplain sedang'])) {
+                            $score = 3;
+                        } elseif (in_array($tingkat, ['Sedang', 'Seragam tidak lengkap', 'Tidak hadir dengan izin', 'Sering mendapat teguran'])) {
+                            $score = 2;
+                        } elseif (in_array($tingkat, ['Berat', 'Penampilan tidak sesuai Standar', 'Mangkir / Alpha', 'Komplain berat'])) {
+                            $score = 1;
+                        }
+                    }
 
                     if ($hasSchedule && $passedWorkingDays > 0) {
                         $totalWeekScore += $score;
@@ -130,6 +178,7 @@ class LaporanController extends Controller
                 'id_user' => $officer->id_user,
                 'nama_lengkap' => $officer->nama_lengkap,
                 'regu' => $officer->regu,
+                'role' => $officer->role,
                 'weekly_scores' => $weeklyScores,
                 'avg_percentage' => $avgPercentage,
                 'penilaian' => $penilaian,
@@ -141,13 +190,17 @@ class LaporanController extends Controller
             $max = $indicatorTotals[$ind]['max'];
             $total = $indicatorTotals[$ind]['total'];
             $achievedPercentage = $max > 0 ? ($total / $max) * 100 : 0;
-            $isTercapai = $achievedPercentage >= $targets[$ind];
+            $ket = 'Sangat buruk';
+            if ($achievedPercentage > 80) $ket = 'Sangat baik';
+            elseif ($achievedPercentage > 60) $ket = 'Baik';
+            elseif ($achievedPercentage > 40) $ket = 'Cukup baik';
+            elseif ($achievedPercentage > 20) $ket = 'Buruk';
 
             $perIndicator[] = [
                 'indikator' => $ind,
                 'target' => $targets[$ind],
                 'achieved_percentage' => $achievedPercentage,
-                'keterangan' => $isTercapai ? 'Tercapai' : 'Tidak Tercapai',
+                'keterangan' => $ket,
             ];
         }
 
@@ -162,15 +215,31 @@ class LaporanController extends Controller
         $user = Auth::user();
         
         // Fetch Security Officers (Anggota)
-        $anggotaQuery = User::where('role', 'Anggota')->where('status_aktif', 1);
+        $anggotaQuery = User::where('status_aktif', 1);
         
         if (strtolower(trim($user->role)) === 'danru') {
-            $anggotaQuery->where('regu', trim($user->regu));
-        } else if ((strtolower(trim($user->role)) === 'chief' || strtolower(trim($user->role)) === 'admin') && $filter_regu) {
-            $anggotaQuery->where('regu', $filter_regu);
+            $anggotaQuery->where('role', 'Anggota')->where('regu', trim($user->regu));
+        } else if (strtolower(trim($user->role)) === 'chief' || strtolower(trim($user->role)) === 'admin') {
+            $anggotaQuery->where('role', 'Anggota');
+            if ($filter_regu) {
+                $anggotaQuery->where('regu', $filter_regu);
+            }
+        } else {
+            $anggotaQuery->where('role', 'Anggota');
         }
         
-        $anggotaList = $anggotaQuery->get();
+        $anggotaList = $anggotaQuery->get()->sort(function($a, $b) {
+            $aRegu = $a->regu ?: 'Z';
+            $bRegu = $b->regu ?: 'Z';
+            $reguCompare = strnatcasecmp($aRegu, $bRegu);
+            if ($reguCompare === 0) {
+                $isADanru = $a->role === 'Danru' ? 0 : 1;
+                $isBDanru = $b->role === 'Danru' ? 0 : 1;
+                if ($isADanru !== $isBDanru) return $isADanru - $isBDanru;
+                return strnatcasecmp($a->nama_lengkap, $b->nama_lengkap);
+            }
+            return $reguCompare;
+        })->values();
         $bulanNum = str_pad($this->parseBulanToNumber($bulan), 2, '0', STR_PAD_LEFT);
         
         $startOfWeek1 = self::getStartOfWeek1($tahun, $bulanNum);
@@ -245,9 +314,9 @@ class LaporanController extends Controller
             foreach ($indicators as $ind) {
                 $violationsForInd = $violations->where('kategori_indikator', $ind);
                 
-                $ringan = $violationsForInd->where('tingkat_pelanggaran', 'Ringan')->count();
-                $sedang = $violationsForInd->where('tingkat_pelanggaran', 'Sedang')->count();
-                $berat = $violationsForInd->where('tingkat_pelanggaran', 'Berat')->count();
+                $ringan = $violationsForInd->where('tingkat_penilaian', 'Ringan')->count();
+                $sedang = $violationsForInd->where('tingkat_penilaian', 'Sedang')->count();
+                $berat = $violationsForInd->where('tingkat_penilaian', 'Berat')->count();
 
                 $score = 5;
                 if ($berat >= 1) $score = 1;
@@ -271,10 +340,12 @@ class LaporanController extends Controller
                 'id_user' => $officer->id_user,
                 'nama_lengkap' => $officer->nama_lengkap,
                 'regu' => $officer->regu,
+                'role' => $officer->role,
                 'scores' => $scores,
                 'total_score' => $totalScore,
                 'percentage' => $percentage,
                 'violations' => $violations,
+                'total_hari_kerja' => $passedWorkingDays,
             ];
 
             $performanceData[] = $officerData;
@@ -285,12 +356,15 @@ class LaporanController extends Controller
 
     private function parseBulanToNumber($bulanStr)
     {
+        if (is_numeric($bulanStr)) {
+            return (int)$bulanStr;
+        }
         $bulanMap = [
             'januari' => 1, 'februari' => 2, 'maret' => 3, 'april' => 4,
             'mei' => 5, 'juni' => 6, 'juli' => 7, 'agustus' => 8,
             'september' => 9, 'oktober' => 10, 'november' => 11, 'desember' => 12
         ];
-        return $bulanMap[strtolower($bulanStr)] ?? 1;
+        return $bulanMap[strtolower(trim($bulanStr))] ?? (int)date('n');
     }
 
     public static function getStartOfWeek1($tahun, $bulanNum)
@@ -322,31 +396,49 @@ class LaporanController extends Controller
             $danru = User::where('role', 'Danru')->where('regu', $regu)->where('status_aktif', 1)->first();
             if (!$danru) continue;
 
-            LaporanBulanan::firstOrCreate(
-                [
-                    'regu' => $regu,
-                    'bulan' => $bulan,
-                    'tahun' => $tahun,
-                ],
-                [
-                    'id_danru_pembuat' => $danru->id_user,
-                    'status_dokumen' => 'Draft',
-                ]
-            );
-
             for ($i = 1; $i <= $totalWeeks; $i++) {
                 \App\Models\LaporanMingguan::firstOrCreate(
                     [
                         'regu' => $regu,
                         'bulan' => $bulan,
                         'tahun' => $tahun,
-                        'minggu_ke' => $i,
+                        'minggu_ke' => $i
                     ],
                     [
                         'id_danru' => $danru->id_user,
+                        'status_dokumen' => 'Draft',
                     ]
                 );
             }
+        }
+
+        // Generate ONE LaporanBulanan for the whole month (Anggota)
+        $chief = User::where('role', 'Chief')->first() ?? User::where('role', 'Admin')->first();
+        if ($chief) {
+            LaporanBulanan::firstOrCreate(
+                [
+                    'regu' => 'Semua',
+                    'bulan' => $bulan,
+                    'tahun' => $tahun,
+                ],
+                [
+                    'id_danru_pembuat' => $chief->id_user,
+                    'status_dokumen' => 'Draft',
+                ]
+            );
+
+            // Generate ONE LaporanBulanan for Danru evaluation
+            LaporanBulanan::firstOrCreate(
+                [
+                    'regu' => 'Laporan_Danru',
+                    'bulan' => $bulan,
+                    'tahun' => $tahun,
+                ],
+                [
+                    'id_danru_pembuat' => $chief->id_user,
+                    'status_dokumen' => 'Draft',
+                ]
+            );
         }
     }
 
@@ -358,6 +450,12 @@ class LaporanController extends Controller
             
             if ($type === 'bulanan') {
                 $lap->is_signable = \Carbon\Carbon::now()->gt($endOfMonth);
+                
+                $unapprovedWeeklyCount = \App\Models\LaporanMingguan::where('bulan', $lap->bulan)
+                    ->where('tahun', $lap->tahun)
+                    ->where('status_dokumen', '!=', 'Approved')
+                    ->count();
+                $lap->all_weekly_approved = $unapprovedWeeklyCount === 0;
             } else {
                 $startOfWeek1 = self::getStartOfWeek1($lap->tahun, $bulanNum);
                 // endOfWeekDate is Friday at 23:59:59 of that specific week (each week is 7 days)
@@ -452,6 +550,10 @@ class LaporanController extends Controller
     {
         $user = Auth::user();
         
+        if (strtolower(trim($user->role)) === 'danru') {
+            abort(403, 'Akses ditolak. Anda tidak memiliki izin untuk melihat laporan bulanan.');
+        }
+
         $now = \Carbon\Carbon::now();
         $defaultBulanMap = [
             1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
@@ -468,12 +570,8 @@ class LaporanController extends Controller
         $this->autoGenerateLaporan($bulan, $tahun);
 
         $laporanQuery = LaporanBulanan::with('danruPembuat')
-            ->where('tahun', $tahun);
-        if (strtolower(trim($user->role)) === 'danru') {
-            $laporanQuery->where('regu', trim($user->regu));
-        } else if ((strtolower(trim($user->role)) === 'chief' || strtolower(trim($user->role)) === 'admin') && $filter_regu) {
-            $laporanQuery->where('regu', $filter_regu);
-        }
+            ->where('tahun', $tahun)
+            ->whereIn('regu', ['Semua', 'Laporan_Danru']);
         $laporanBulanan = $this->attachSignableStatus($laporanQuery->get(), 'bulanan');
         $laporanBulanan = collect($laporanBulanan)->sortBy(function ($item) {
             return $this->parseBulanToNumber($item->bulan);
@@ -641,40 +739,126 @@ class LaporanController extends Controller
         return redirect()->back()->with('error', 'Tipe export tidak valid');
     }
 
+    private function getDanruMonthlyData($bulan, $tahun)
+    {
+        $bulanNum = str_pad($this->parseBulanToNumber($bulan), 2, '0', STR_PAD_LEFT);
+
+        $danrus = User::where('role', 'Danru')->where('status_aktif', 1)->get();
+        $perPerson = [];
+        $totalPengawasan = 0; $countPengawasan = 0;
+        $totalPelaporan = 0; $countPelaporan = 0;
+        $totalPenyelesaian = 0; $countPenyelesaian = 0;
+
+        foreach ($danrus as $danru) {
+            $scores = [
+                'Pengawasan Personel' => 5,
+                'Ketepatan Pelaporan' => 5,
+                'Penyelesaian Masalah' => 5,
+            ];
+
+            $pelanggarans = \App\Models\CatatanPelanggaran::where('id_anggota', $danru->id_user)
+                ->where('bulan', $bulan)
+                ->where('tahun', $tahun)
+                ->get();
+
+            foreach ($pelanggarans as $p) {
+                if (isset($scores[$p->kategori_indikator])) {
+                    if (preg_match('/Skor (\d+)/', $p->tingkat_penilaian, $matches)) {
+                        // Keep the lowest score if multiple infractions
+                        $score = (int)$matches[1];
+                        if ($score < $scores[$p->kategori_indikator]) {
+                            $scores[$p->kategori_indikator] = $score;
+                        }
+                    }
+                }
+            }
+
+            $avg_score = array_sum($scores) / count($scores);
+            $avg_percentage = ($avg_score / 5) * 100;
+
+            $perPerson[] = [
+                'id_user' => $danru->id_user,
+                'nama_lengkap' => $danru->nama_lengkap,
+                'role' => $danru->role,
+                'regu' => $danru->regu,
+                'indicator_scores' => $scores,
+                'avg_score' => $avg_score,
+                'avg_percentage' => $avg_percentage,
+            ];
+
+            $totalPengawasan += $scores['Pengawasan Personel']; $countPengawasan++;
+            $totalPelaporan += $scores['Ketepatan Pelaporan']; $countPelaporan++;
+            $totalPenyelesaian += $scores['Penyelesaian Masalah']; $countPenyelesaian++;
+        }
+
+        $perIndicator = [];
+        $indicators = [
+            ['name' => 'Pengawasan Personel', 'total' => $totalPengawasan, 'count' => $countPengawasan],
+            ['name' => 'Ketepatan Pelaporan', 'total' => $totalPelaporan, 'count' => $countPelaporan],
+            ['name' => 'Penyelesaian Masalah', 'total' => $totalPenyelesaian, 'count' => $countPenyelesaian],
+        ];
+
+        foreach ($indicators as $ind) {
+            $avgScore = $ind['count'] > 0 ? $ind['total'] / $ind['count'] : 5;
+            $achievedPercentage = ($avgScore / 5) * 100;
+            
+            $keterangan = 'Sangat buruk';
+            if ($achievedPercentage > 80) { $keterangan = 'Sangat baik'; }
+            elseif ($achievedPercentage > 60) { $keterangan = 'Baik'; }
+            elseif ($achievedPercentage > 40) { $keterangan = 'Cukup baik'; }
+            elseif ($achievedPercentage > 20) { $keterangan = 'Buruk'; }
+
+            $perIndicator[] = [
+                'indikator' => $ind['name'],
+                'target' => 100,
+                'achieved_percentage' => $achievedPercentage,
+                'keterangan' => $keterangan,
+            ];
+        }
+
+        return [
+            'perPerson' => $perPerson,
+            'perIndicator' => $perIndicator,
+        ];
+    }
+
     public function exportLaporanBulanan(Request $request)
     {
         $type = $request->query('type', 'pdf');
+        $jenis = $request->query('jenis', 'anggota'); // anggota atau danru
         $bulan = $request->query('bulan', 'Juli');
         $tahun = (int)$request->query('tahun', 2026);
         $filter_regu = $request->query('filter_regu');
 
-        $detailedMonthlyData = $this->getDetailedMonthlyData($bulan, $tahun, $filter_regu);
-        
         $user = Auth::user();
-        $laporanQuery = LaporanBulanan::with('danruPembuat')
-            ->where('bulan', $bulan)
-            ->where('tahun', $tahun);
-            
-        if ($user && strtolower(trim($user->role)) === 'danru') {
-            $laporanQuery->where('regu', trim($user->regu));
-        } else if ($filter_regu) {
-            $laporanQuery->where('regu', $filter_regu);
+
+        if ($jenis === 'danru') {
+            $detailedMonthlyData = $this->getDanruMonthlyData($bulan, $tahun);
+            $laporanQuery = LaporanBulanan::with('danruPembuat')
+                ->where('bulan', $bulan)
+                ->where('tahun', $tahun)
+                ->where('regu', 'Laporan_Danru');
+        } else {
+            $detailedMonthlyData = $this->getDetailedMonthlyData($bulan, $tahun, $filter_regu);
+            $laporanQuery = LaporanBulanan::with('danruPembuat')
+                ->where('bulan', $bulan)
+                ->where('tahun', $tahun)
+                ->where('regu', 'Semua');
         }
         
         $laporanBulanan = $laporanQuery->first();
 
         if ($type === 'excel') {
-            // Kita akan menggunakan view export ini juga untuk sementara jika LaporanBulananWorkflowExport belum terupdate.
-            // Biarkan as-is atau ubah sesuai kebutuhan jika excel belum support 2 table.
             return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\LaporanBulananWorkflowExport($tahun), "laporan_bulanan_{$bulan}_{$tahun}.xlsx");
         } else if ($type === 'pdf') {
-            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.laporan_bulanan', [
+            $viewName = $jenis === 'danru' ? 'exports.laporan_bulanan_danru' : 'exports.laporan_bulanan';
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($viewName, [
                 'detailedMonthlyData' => $detailedMonthlyData,
                 'laporanBulananObj' => $laporanBulanan,
                 'bulan' => $bulan,
                 'tahun' => $tahun,
             ])->setPaper('a4', 'landscape');
-            return $pdf->stream("laporan_bulanan_{$bulan}_{$tahun}.pdf");
+            return $pdf->stream("laporan_bulanan_{$jenis}_{$bulan}_{$tahun}.pdf");
         }
 
         return redirect()->back()->with('error', 'Tipe export tidak valid');
