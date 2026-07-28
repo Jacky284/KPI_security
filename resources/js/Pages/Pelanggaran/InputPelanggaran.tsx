@@ -90,7 +90,7 @@ export default function InputPelanggaran({ anggota, jadwals, userRole }: Props) 
     deskripsi_penilaian: "",
   });
 
-  const categories = userRole === "Chief" 
+  const categories = userRole === "Chief"
     ? ["Pengawasan Personel", "Ketepatan Pelaporan", "Penyelesaian Masalah"]
     : [
         "Disiplin Kerja",
@@ -177,11 +177,11 @@ export default function InputPelanggaran({ anggota, jadwals, userRole }: Props) 
 
   return (
     <>
-      <Head title="Input Penilaian" />
+      <Head title="Input Pelanggaran" />
       <div className="flex flex-col gap-6 max-w-7xl mx-auto">
         <div>
-          <h1 className="text-2xl font-bold text-primary tracking-tight">Input Catatan Penilaian Sekuriti</h1>
-          <p className="text-sm text-muted-foreground mt-1">Gunakan formulir ini untuk mencatat penilaian kinerja anggota sekuriti demi perhitungan KPI bulanan.</p>
+          <h1 className="text-2xl font-bold text-primary tracking-tight">Input Catatan Pelanggaran Security</h1>
+          <p className="text-sm text-muted-foreground mt-1">Gunakan formulir ini untuk mencatat pelaporan indisipliner / pelanggaran anggota sekuriti demi perhitungan KPI bulanan.</p>
         </div>
         <Card className="shadow-md">
           <CardContent className="pt-6">
@@ -305,8 +305,18 @@ export default function InputPelanggaran({ anggota, jadwals, userRole }: Props) 
               </div>
 
               {/* Submit Button */}
+              {shiftName === 'Libur' && (
+                <div className="mt-4 p-3 bg-red-100 text-red-700 text-sm font-semibold rounded-md border border-red-200">
+                  Tidak dapat menginput penilaian karena Anggota/Danru sedang Libur pada tanggal tersebut.
+                </div>
+              )}
+
               <div className="flex justify-end gap-2 mt-4">
-                <Button type="submit" disabled={processing} className="w-full md:w-auto px-6">
+                <Button
+                  type="submit"
+                  disabled={processing || shiftName === 'Libur'}
+                  className={`w-full md:w-auto px-6 ${shiftName === 'Libur' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
                   {processing ? "Menyimpan..." : "Simpan Pelanggaran"}
                 </Button>
               </div>

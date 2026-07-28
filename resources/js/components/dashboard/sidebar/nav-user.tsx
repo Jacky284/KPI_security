@@ -11,6 +11,7 @@ export function NavUser({
   user,
 }: {
   readonly user: {
+    readonly id_user: number;
     readonly name: string;
     readonly email: string;
     readonly avatar: string;
@@ -23,7 +24,12 @@ export function NavUser({
       <SidebarMenuItem>
         <SidebarMenuButton
           size="lg"
-          className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground cursor-default"
+          className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground cursor-pointer"
+          onClick={() => {
+            if (user.id_user) {
+              router.visit(`/anggota/${user.id_user}`);
+            }
+          }}
         >
           <Avatar className="h-8 w-8 rounded-lg grayscale">
             <AvatarImage src={user.avatar || undefined} alt={user.name} />
@@ -34,7 +40,7 @@ export function NavUser({
             <span className="truncate text-muted-foreground text-xs">{user.email}</span>
           </div>
           <div
-            onClick={(e) => { e.preventDefault(); router.post('/logout'); }}
+            onClick={(e) => { e.stopPropagation(); e.preventDefault(); router.post('/logout'); }}
             className="ml-auto p-2 rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors cursor-pointer"
             title="Log out"
           >

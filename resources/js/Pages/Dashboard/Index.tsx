@@ -40,6 +40,13 @@ interface TrendData {
   [key: string]: string | number;
 }
 
+interface MonthStatusItem {
+  bulan: string;
+  tahun: number;
+  danrus: DanruDashboardData[];
+  isCurrentMonth: boolean;
+}
+
 interface Props {
   anggota?: Anggota[];
   danrus?: DanruDashboardData[];
@@ -51,9 +58,10 @@ interface Props {
   currentTahun?: number;
   trendPagi?: TrendData[];
   trendMalam?: TrendData[];
+  monthStatusList?: MonthStatusItem[];
 }
 
-export default function Page({ anggota, danrus, currentUser, weekDates, jadwalMingguan, currentStartDate, currentBulan, currentTahun, trendPagi, trendMalam }: Props) {
+export default function Page({ anggota, danrus, currentUser, weekDates, jadwalMingguan, currentStartDate, currentBulan, currentTahun, trendPagi, trendMalam, monthStatusList }: Props) {
   const isChiefOrAdmin = currentUser.role === "Chief" || currentUser.role === "Admin";
   
   const navigateWeek = (direction: 'prev' | 'next') => {
@@ -91,14 +99,20 @@ export default function Page({ anggota, danrus, currentUser, weekDates, jadwalMi
     return <Minus className="size-5 text-muted-foreground mx-auto opacity-50" title="Minggu belum terlewati" />;
   };
 
-  const sortedDanrus = React.useMemo(() => {
-    if (!danrus) return [];
-    return [...danrus].sort((a, b) => {
-      const reguA = a.regu || '';
-      const reguB = b.regu || '';
-      return reguA.localeCompare(reguB, undefined, { numeric: true, sensitivity: 'base' });
-    });
-  }, [danrus]);
+  const displayMonths = React.useMemo(() => {
+    if (monthStatusList && monthStatusList.length > 0) {
+      return monthStatusList;
+    }
+    if (danrus) {
+      return [{
+        bulan: currentBulan || '',
+        tahun: currentTahun || new Date().getFullYear(),
+        danrus: danrus,
+        isCurrentMonth: true
+      }];
+    }
+    return [];
+  }, [monthStatusList, danrus, currentBulan, currentTahun]);
 
   return (
     <>
@@ -117,96 +131,108 @@ export default function Page({ anggota, danrus, currentUser, weekDates, jadwalMi
         </div>
 
         {isChiefOrAdmin ? (
-          <Card className="shadow-xs border-2 overflow-hidden">
-            <CardHeader className="bg-muted/30 border-b pb-4">
-              <CardTitle className="text-md font-bold flex items-center gap-2">
-                <Users className="size-5 text-primary" />
-                Status Laporan Mingguan Danru ({currentBulan} {currentTahun})
-              </CardTitle>
-              <CardDescription>
-                Pantau progres persetujuan laporan mingguan dari setiap Danru di bulan ini.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              {/* Desktop View */}
-              <div className="hidden lg:block overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-muted/50 border-b">
-                    <tr>
-                      <th className="p-3 font-semibold w-12 text-center text-muted-foreground border-r">No</th>
-                      <th className="p-3 font-semibold text-muted-foreground border-r">Nama Danru</th>
-                      <th className="p-3 font-semibold text-center text-muted-foreground border-r">Regu</th>
-                      <th className="p-3 font-semibold text-center text-muted-foreground border-r">Minggu 1</th>
-                      <th className="p-3 font-semibold text-center text-muted-foreground border-r">Minggu 2</th>
-                      <th className="p-3 font-semibold text-center text-muted-foreground border-r">Minggu 3</th>
-                      <th className="p-3 font-semibold text-center text-muted-foreground">Minggu 4</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedDanrus && sortedDanrus.length > 0 ? (
-                      sortedDanrus.map((d, index) => (
-                        <tr key={d.id_user} className="border-b last:border-0 hover:bg-muted/10 transition-colors">
-                          <td className="p-3 text-center text-muted-foreground font-mono text-xs border-r">{index + 1}</td>
-                          <td className="p-3 font-bold text-foreground border-r">{d.nama_lengkap}</td>
-                          <td className="p-3 text-center font-medium border-r"><span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs uppercase">{d.regu || '-'}</span></td>
-                          <td className="p-3 text-center border-r">{renderStatusIcon(d.mingguan_status.minggu_1)}</td>
-                          <td className="p-3 text-center border-r">{renderStatusIcon(d.mingguan_status.minggu_2)}</td>
-                          <td className="p-3 text-center border-r">{renderStatusIcon(d.mingguan_status.minggu_3)}</td>
-                          <td className="p-3 text-center">{renderStatusIcon(d.mingguan_status.minggu_4)}</td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={7} className="p-8 text-center text-muted-foreground">
+          <div className="flex flex-col gap-6">
+            {displayMonths.map((mItem) => {
+              const sortedDanrus = [...(mItem.danrus || [])].sort((a, b) => {
+                const reguA = a.regu || '';
+                const reguB = b.regu || '';
+                return reguA.localeCompare(reguB, undefined, { numeric: true, sensitivity: 'base' });
+              });
+
+              return (
+                <Card key={`${mItem.bulan}-${mItem.tahun}`} className="shadow-xs border-2 overflow-hidden">
+                  <CardHeader className="bg-muted/30 border-b pb-4">
+                    <CardTitle className="text-md font-bold flex items-center gap-2">
+                      <Users className="size-5 text-primary" />
+                      Status Laporan Mingguan Danru ({mItem.bulan} {mItem.tahun})
+                    </CardTitle>
+                    <CardDescription>
+                      Pantau progres persetujuan laporan mingguan dari setiap Danru di bulan {mItem.isCurrentMonth ? "ini" : "lalu"}.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {/* Desktop View */}
+                    <div className="hidden lg:block overflow-x-auto">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-muted/50 border-b">
+                          <tr>
+                            <th className="p-3 font-semibold w-12 text-center text-muted-foreground border-r">No</th>
+                            <th className="p-3 font-semibold text-muted-foreground border-r">Nama Danru</th>
+                            <th className="p-3 font-semibold text-center text-muted-foreground border-r">Regu</th>
+                            <th className="p-3 font-semibold text-center text-muted-foreground border-r">Minggu 1</th>
+                            <th className="p-3 font-semibold text-center text-muted-foreground border-r">Minggu 2</th>
+                            <th className="p-3 font-semibold text-center text-muted-foreground border-r">Minggu 3</th>
+                            <th className="p-3 font-semibold text-center text-muted-foreground">Minggu 4</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sortedDanrus && sortedDanrus.length > 0 ? (
+                            sortedDanrus.map((d, index) => (
+                              <tr key={d.id_user} className="border-b last:border-0 hover:bg-muted/10 transition-colors">
+                                <td className="p-3 text-center text-muted-foreground font-mono text-xs border-r">{index + 1}</td>
+                                <td className="p-3 font-bold text-foreground border-r">{d.nama_lengkap}</td>
+                                <td className="p-3 text-center font-medium border-r"><span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs uppercase">{d.regu || '-'}</span></td>
+                                <td className="p-3 text-center border-r">{renderStatusIcon(d.mingguan_status.minggu_1)}</td>
+                                <td className="p-3 text-center border-r">{renderStatusIcon(d.mingguan_status.minggu_2)}</td>
+                                <td className="p-3 text-center border-r">{renderStatusIcon(d.mingguan_status.minggu_3)}</td>
+                                <td className="p-3 text-center">{renderStatusIcon(d.mingguan_status.minggu_4)}</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                                <div className="flex flex-col items-center justify-center gap-2">
+                                  <AlertTriangle className="size-8 text-muted-foreground/50" />
+                                  <p>Tidak ada data Danru ditemukan.</p>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile View */}
+                    <div className="lg:hidden flex flex-col gap-4 p-4">
+                      {sortedDanrus && sortedDanrus.length > 0 ? (
+                        sortedDanrus.map((d, index) => (
+                          <div key={d.id_user} className="flex flex-col gap-3 p-4 border rounded-xl bg-card shadow-sm">
+                            <div className="flex justify-between items-start">
+                              <div className="flex gap-3 items-center">
+                                <div className="flex items-center justify-center size-8 rounded-full bg-muted font-bold text-muted-foreground text-xs">{index + 1}</div>
+                                <div>
+                                  <div className="font-bold text-foreground text-sm">{d.nama_lengkap}</div>
+                                  <span className="inline-block mt-1 bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] font-bold uppercase">{d.regu || '-'}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 pt-3 border-t">
+                              {[1, 2, 3, 4].map((m) => {
+                                 const key = `minggu_${m}` as keyof typeof d.mingguan_status;
+                                 return (
+                                   <div key={m} className="flex flex-col items-center p-2 bg-muted/30 rounded-lg border text-xs">
+                                     <span className="font-semibold mb-1 text-muted-foreground">M{m}</span>
+                                     {renderStatusIcon(d.mingguan_status[key])}
+                                   </div>
+                                 );
+                              })}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-8 text-center text-muted-foreground border rounded-xl border-dashed">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <AlertTriangle className="size-8 text-muted-foreground/50" />
-                            <p>Tidak ada data Danru ditemukan.</p>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Mobile View */}
-              <div className="lg:hidden flex flex-col gap-4 p-4">
-                {sortedDanrus && sortedDanrus.length > 0 ? (
-                  sortedDanrus.map((d, index) => (
-                    <div key={d.id_user} className="flex flex-col gap-3 p-4 border rounded-xl bg-card shadow-sm">
-                      <div className="flex justify-between items-start">
-                        <div className="flex gap-3 items-center">
-                          <div className="flex items-center justify-center size-8 rounded-full bg-muted font-bold text-muted-foreground text-xs">{index + 1}</div>
-                          <div>
-                            <div className="font-bold text-foreground text-sm">{d.nama_lengkap}</div>
-                            <span className="inline-block mt-1 bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] font-bold uppercase">{d.regu || '-'}</span>
+                            <p className="text-sm">Tidak ada data Danru ditemukan.</p>
                           </div>
                         </div>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 pt-3 border-t">
-                        {[1, 2, 3, 4].map((m) => {
-                           const key = `minggu_${m}` as keyof typeof d.mingguan_status;
-                           return (
-                             <div key={m} className="flex flex-col items-center p-2 bg-muted/30 rounded-lg border text-xs">
-                               <span className="font-semibold mb-1 text-muted-foreground">M{m}</span>
-                               {renderStatusIcon(d.mingguan_status[key])}
-                             </div>
-                           );
-                        })}
-                      </div>
+                      )}
                     </div>
-                  ))
-                ) : (
-                  <div className="p-8 text-center text-muted-foreground border rounded-xl border-dashed">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <AlertTriangle className="size-8 text-muted-foreground/50" />
-                      <p className="text-sm">Tidak ada data Danru ditemukan.</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
         ) : (
           <>
             <Card className="shadow-xs border-2 overflow-hidden">
@@ -231,18 +257,6 @@ export default function Page({ anggota, danrus, currentUser, weekDates, jadwalMi
                   </Button>
                 </div>
                 
-                <div className="flex items-center gap-2 bg-background p-1 rounded-md border shadow-sm md:ml-auto">
-                  <Button asChild variant="outline" size="sm" className="bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200 h-8">
-                    <a href={`/export/jadwal-mingguan?type=excel&start_date=${currentStartDate}`} target="_blank">
-                      Export Excel
-                    </a>
-                  </Button>
-                  <Button asChild variant="outline" size="sm" className="bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 border-red-200 h-8">
-                    <a href={`/export/jadwal-mingguan?type=pdf&start_date=${currentStartDate}`} target="_blank">
-                      Export PDF
-                    </a>
-                  </Button>
-                </div>
               </CardHeader>
               <CardContent className="p-0">
                 {/* Desktop View */}

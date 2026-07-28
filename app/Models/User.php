@@ -25,6 +25,7 @@ class User extends Authenticatable
         'tanggal_lahir',
         'foto_profil',
         'sisa_cuti',
+        'ttd_url',
     ];
 
     protected $hidden = [

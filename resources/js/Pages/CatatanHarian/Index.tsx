@@ -11,7 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus } from "lucide-react";
+import { Plus, FileText } from "lucide-react";
 
 interface Anggota {
   id_user: number;
@@ -25,6 +25,9 @@ interface CatatanHarian {
   id_danru: number;
   id_anggota: number;
   tanggal: string;
+  jam_kejadian?: string | null;
+  shift?: string | null;
+  pos_lokasi?: string | null;
   minggu_ke: number;
   bulan: string;
   tahun: number;
@@ -33,6 +36,7 @@ interface CatatanHarian {
   arahan: string | null;
   status_tindak_lanjut: "Sudah" | "Belum";
   keterangan: string | null;
+  created_at?: string;
   anggota?: { id_user: number; nama_lengkap: string; regu: string; role?: string };
   danru?: { id_user: number; nama_lengkap: string };
 }
@@ -65,7 +69,7 @@ export default function CatatanHarianIndex({
     "Januari", "Februari", "Maret", "April", "Mei", "Juni",
     "Juli", "Agustus", "September", "Oktober", "November", "Desember"
   ];
-  const availableWeeks = [1, 2, 3, 4, 5, 6];
+  const availableWeeks = [1, 2, 3, 4];
 
   const handleFilterChange = (bulan: string, minggu: number, tahun: number, regu?: string) => {
     const params: any = { bulan, minggu_ke: minggu, tahun };
@@ -73,9 +77,32 @@ export default function CatatanHarianIndex({
     router.get("/catatan-harian", params);
   };
 
+  const getCurrentTimeString = () => {
+    const d = new Date();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
+  const formatTime = (jamKejadian?: string | null, createdAt?: string) => {
+    if (jamKejadian) {
+      return ` (${jamKejadian.substring(0, 5)})`;
+    }
+    if (createdAt) {
+      const d = new Date(createdAt);
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      return ` (${hours}:${minutes})`;
+    }
+    return "";
+  };
+
   const { data, setData, post, processing, errors, reset } = useForm({
     id_anggota: "",
     tanggal: new Date().toISOString().split('T')[0],
+    jam_kejadian: getCurrentTimeString(),
+    shift: "Pagi",
+    pos_lokasi: "",
     indikator: userRole === "Chief" ? "Pengawasan Personel" : "Disiplin Kerja",
     deskripsi: "",
     arahan: "",
@@ -123,10 +150,13 @@ export default function CatatanHarianIndex({
       <div className="flex flex-col gap-6 max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-primary tracking-tight">Catatan Harian {userRole === 'Chief' ? 'Chief' : 'Danru'}</h1>
+            <h1 className="text-2xl font-bold text-primary tracking-tight">
+              Catatan Harian {userRole === 'Admin' ? 'Danru & Chief' : (userRole === 'Chief' ? 'Chief' : 'Danru')}
+            </h1>
             <p className="text-sm text-muted-foreground">Log aktivitas dan temuan harian. Tidak memotong poin KPI utama.</p>
           </div>
           
+          <div className="flex flex-col md:flex-row gap-2">
           {(userRole === "Danru" || userRole === "Admin" || userRole === "Chief") && (
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
               <DialogTrigger asChild>
@@ -139,29 +169,51 @@ export default function CatatanHarianIndex({
                   <DialogTitle>Input Catatan Harian</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-2">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-semibold">Tanggal</label>
-                    <input
-                      type="date"
-                      value={data.tanggal}
-                      onChange={(e) => setData("tanggal", e.target.value)}
-                      className="p-2 border rounded-md"
-                      required
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-semibold">Tanggal</label>
+                      <input
+                        type="date"
+                        value={data.tanggal}
+                        onChange={(e) => setData("tanggal", e.target.value)}
+                        className="p-2 border rounded-md"
+                        required
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-semibold">Jam Kejadian</label>
+                      <input
+                        type="time"
+                        value={data.jam_kejadian}
+                        onChange={(e) => setData("jam_kejadian", e.target.value)}
+                        className="p-2 border rounded-md"
+                        required
+                      />
+                    </div>
                   </div>
                   
                   <div className="flex flex-col gap-1.5">
                     <label className="text-sm font-semibold">
-                      {userRole === "Chief" || userRole === "Admin" ? "Danru" : "Anggota"}
+                      {userRole === "Chief" || userRole === "Admin" ? "Personel" : "Anggota"}
                     </label>
                     <select
                       value={data.id_anggota}
-                      onChange={(e) => setData("id_anggota", e.target.value)}
+                      onChange={(e) => {
+                        const newId = e.target.value;
+                        const selectedPerson = anggota.find(a => a.id_user.toString() === newId);
+                        const isDanru = selectedPerson?.role === 'Danru';
+                        const newIndikator = isDanru ? "Pengawasan Personel" : "Disiplin Kerja";
+                        setData(prev => ({
+                          ...prev,
+                          id_anggota: newId,
+                          indikator: newIndikator
+                        }));
+                      }}
                       className="p-2 border rounded-md"
                       required
                     >
                       <option value="">
-                        {userRole === "Chief" || userRole === "Admin" ? "-- Pilih Danru --" : "-- Pilih Anggota --"}
+                        {userRole === "Chief" || userRole === "Admin" ? "-- Pilih Personel --" : "-- Pilih Anggota --"}
                       </option>
                       {anggota.map((person) => (
                         <option key={person.id_user} value={person.id_user}>
@@ -172,6 +224,45 @@ export default function CatatanHarianIndex({
                   </div>
 
                   <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-semibold">Shift</label>
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="shift"
+                          value="Pagi"
+                          checked={data.shift === "Pagi"}
+                          onChange={(e) => setData("shift", e.target.value)}
+                          className="w-4 h-4 text-primary"
+                        />
+                        Pagi
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="shift"
+                          value="Malam"
+                          checked={data.shift === "Malam"}
+                          onChange={(e) => setData("shift", e.target.value)}
+                          className="w-4 h-4 text-primary"
+                        />
+                        Malam
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-semibold">Pos / Lokasi</label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: Pos Utama, Lobby Utama, Gate A"
+                      value={data.pos_lokasi}
+                      onChange={(e) => setData("pos_lokasi", e.target.value)}
+                      className="p-2 border rounded-md text-sm"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
                     <label className="text-sm font-semibold">Indikator</label>
                     <select
                       value={data.indikator}
@@ -179,12 +270,17 @@ export default function CatatanHarianIndex({
                       className="p-2 border rounded-md"
                       required
                     >
-                      {(userRole === "Chief" 
-                        ? ["Pengawasan Personel", "Ketepatan Pelaporan", "Penyelesaian Masalah"] 
-                        : ["Disiplin Kerja", "Penampilan & Kerapihan", "Kehadiran", "Komunikasi & Pelayanan"]
-                      ).map((cat) => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
+                      {(() => {
+                        const selectedPerson = anggota.find(a => a.id_user.toString() === data.id_anggota?.toString());
+                        const isSelectedDanru = selectedPerson?.role === 'Danru';
+                        const options = isSelectedDanru 
+                          ? ["Pengawasan Personel", "Ketepatan Pelaporan", "Penyelesaian Masalah"] 
+                          : ["Disiplin Kerja", "Penampilan & Kerapihan", "Kehadiran", "Komunikasi & Pelayanan"];
+                        
+                        return options.map((cat) => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ));
+                      })()}
                     </select>
                   </div>
 
@@ -233,15 +329,26 @@ export default function CatatanHarianIndex({
                     </div>
                   </div>
 
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-semibold">Keterangan</label>
+                    <textarea
+                      placeholder="Catatan tambahan / keterangan tindak lanjut (opsional)"
+                      value={data.keterangan}
+                      onChange={(e) => setData("keterangan", e.target.value)}
+                      className="p-2 border rounded-md min-h-[60px] text-sm"
+                    />
+                  </div>
+
                   <div className="flex justify-end gap-2 mt-4">
                     <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Batal</Button>
                     <Button type="submit" disabled={processing}>Simpan</Button>
                   </div>
                 </form>
-              </DialogContent>
-            </Dialog>
-          )}
-        </div>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
+          </div>
 
         {/* Filters */}
         <div className="flex flex-col md:flex-row md:flex-wrap gap-4 md:items-center bg-card border p-4 rounded-lg shadow-2xs">
@@ -276,7 +383,28 @@ export default function CatatanHarianIndex({
               />
             </div>
 
-            </div>
+            {(userRole === "Chief" || userRole === "Admin") && reguList && reguList.length > 0 && (
+              <div className="flex flex-col gap-1 md:border-l md:pl-4 w-full md:w-auto">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Filter Regu</label>
+                <select
+                  value={filterRegu || ""}
+                  onChange={(e) => handleFilterChange(selectedBulan, selectedMinggu, selectedTahun, e.target.value)}
+                  className="p-2 text-sm border rounded-md"
+                >
+                  <option value="">Semua Regu</option>
+                  {reguList.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-2 md:border-l md:pl-4 md:ml-auto w-full md:w-auto">
+            <Button asChild variant="outline" size="sm" className="w-full sm:w-auto bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 border-red-200">
+              <a href={`/catatan-harian/export-pdf?bulan=${selectedBulan}&tahun=${selectedTahun}&minggu_ke=${selectedMinggu}${filterRegu ? `&filter_regu=${filterRegu}` : ''}`} target="_blank">
+                Export PDF
+              </a>
+            </Button>
+          </div>
         </div>
 
         <Card>
@@ -286,12 +414,14 @@ export default function CatatanHarianIndex({
                 <thead>
                   <tr className="border-b bg-muted/50 text-muted-foreground font-bold">
                     <th className="p-3">Tanggal</th>
+                    <th className="p-3">Shift</th>
+                    <th className="p-3">Pos / Lokasi</th>
                     <th className="p-3">Nama Anggota</th>
                     <th className="p-3">Regu</th>
                     <th className="p-3">Indikator</th>
                     <th className="p-3">Deskripsi & Arahan</th>
-                    <th className="p-3">Danru Penilai</th>
                     <th className="p-3 text-center">Status</th>
+                    <th className="p-3">Keterangan</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -302,6 +432,8 @@ export default function CatatanHarianIndex({
                           <div className="text-xs text-muted-foreground font-semibold uppercase">{formatDayName(c.tanggal)}</div>
                           <div className="font-bold text-sm">{formatDateFull(c.tanggal)}</div>
                         </td>
+                        <td className="p-3 whitespace-nowrap font-medium text-muted-foreground">{c.shift || "-"}{formatTime(c.jam_kejadian, c.created_at)}</td>
+                        <td className="p-3 whitespace-nowrap font-semibold text-foreground">{c.pos_lokasi || "-"}</td>
                         <td className="p-3 font-bold">
                           <div className="flex items-center gap-2">
                             <span>{c.anggota?.nama_lengkap}</span>
@@ -318,7 +450,6 @@ export default function CatatanHarianIndex({
                           <div className="text-xs text-muted-foreground mb-1"><span className="font-semibold text-foreground">Temuan:</span> {c.deskripsi}</div>
                           {c.arahan && <div className="text-xs text-muted-foreground"><span className="font-semibold text-foreground">Arahan:</span> {c.arahan}</div>}
                         </td>
-                        <td className="p-3">{c.danru?.nama_lengkap}</td>
                         <td className="p-3 text-center">
                           {c.status_tindak_lanjut === "Sudah" ? (
                             <Badge className="bg-green-500/10 text-green-600 border-green-500/20 shadow-none hover:bg-green-500/10">
@@ -340,13 +471,15 @@ export default function CatatanHarianIndex({
                               )}
                             </div>
                           )}
-                          {c.keterangan && <div className="text-[9px] text-muted-foreground mt-1 max-w-[150px] truncate mx-auto" title={c.keterangan}>{c.keterangan}</div>}
+                        </td>
+                        <td className="p-3">
+                          <div className="text-xs text-muted-foreground">{c.keterangan || "-"}</div>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={7} className="text-center p-8 text-muted-foreground">Belum ada catatan harian di periode ini.</td>
+                      <td colSpan={9} className="text-center p-8 text-muted-foreground">Belum ada catatan harian di periode ini.</td>
                     </tr>
                   )}
                 </tbody>
@@ -365,7 +498,12 @@ export default function CatatanHarianIndex({
                             <span className="bg-destructive/15 text-destructive font-bold text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">Danru</span>
                           )}
                         </div>
-                        <span className="inline-block mt-1 bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] font-bold uppercase">{c.anggota?.regu}</span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] font-bold uppercase">{c.anggota?.regu}</span>
+                          {c.pos_lokasi && (
+                            <span className="bg-muted text-muted-foreground px-2 py-0.5 rounded text-[10px] font-semibold">{c.pos_lokasi}</span>
+                          )}
+                        </div>
                       </div>
                       <div className="flex flex-col items-end gap-1">
                         <div className="text-[10px] text-muted-foreground font-semibold uppercase">{formatDayName(c.tanggal)}</div>
@@ -378,12 +516,10 @@ export default function CatatanHarianIndex({
                       <div className="text-xs text-muted-foreground mt-1 bg-muted/30 p-2 rounded border">
                         <div><span className="font-semibold text-foreground">Temuan:</span> {c.deskripsi}</div>
                         {c.arahan && <div className="mt-1"><span className="font-semibold text-foreground">Arahan:</span> {c.arahan}</div>}
+                        {c.keterangan && <div className="mt-1"><span className="font-semibold text-foreground">Ket:</span> {c.keterangan}</div>}
                       </div>
                       
-                      <div className="flex justify-between items-center mt-3 pt-3 border-t">
-                        <div className="text-[10px] text-muted-foreground">
-                          <span className="font-semibold">Oleh:</span> {c.danru?.nama_lengkap}
-                        </div>
+                      <div className="flex justify-end items-center mt-3 pt-3 border-t">
                         <div className="flex items-center gap-2">
                           {c.status_tindak_lanjut === "Sudah" ? (
                             <Badge className="bg-green-500/10 text-green-600 border-green-500/20 shadow-none hover:bg-green-500/10 text-[9px] px-1.5 py-0">Sudah</Badge>

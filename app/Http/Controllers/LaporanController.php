@@ -41,10 +41,10 @@ class LaporanController extends Controller
         })->values();
         $indicators = ['Disiplin Kerja', 'Kehadiran', 'Penampilan & Kerapihan', 'Komunikasi & Pelayanan'];
         $targets = [
-            'Disiplin Kerja' => 90,
+            'Disiplin Kerja' => 95,
             'Kehadiran' => 100,
             'Penampilan & Kerapihan' => 100,
-            'Komunikasi & Pelayanan' => 85,
+            'Komunikasi & Pelayanan' => 90,
         ];
 
         $perPerson = [];
@@ -190,11 +190,8 @@ class LaporanController extends Controller
             $max = $indicatorTotals[$ind]['max'];
             $total = $indicatorTotals[$ind]['total'];
             $achievedPercentage = $max > 0 ? ($total / $max) * 100 : 0;
-            $ket = 'Sangat buruk';
-            if ($achievedPercentage > 80) $ket = 'Sangat baik';
-            elseif ($achievedPercentage > 60) $ket = 'Baik';
-            elseif ($achievedPercentage > 40) $ket = 'Cukup baik';
-            elseif ($achievedPercentage > 20) $ket = 'Buruk';
+            
+            $ket = $achievedPercentage >= $targets[$ind] ? 'Tercapai' : 'Tidak tercapai';
 
             $perIndicator[] = [
                 'indikator' => $ind,
@@ -273,7 +270,7 @@ class LaporanController extends Controller
         }
 
         $performanceData = [];
-        $indicators = ['Kedisiplinan', 'Kehadiran', 'Kerapihan', 'Komunikasi'];
+        $indicators = ['Disiplin Kerja', 'Kehadiran', 'Penampilan & Kerapihan', 'Komunikasi & Pelayanan'];
         $now = \Carbon\Carbon::now();
 
         foreach ($anggotaList as $officer) {
@@ -312,17 +309,23 @@ class LaporanController extends Controller
             $totalScore = 0;
 
             foreach ($indicators as $ind) {
-                $violationsForInd = $violations->where('kategori_indikator', $ind);
-                
-                $ringan = $violationsForInd->where('tingkat_penilaian', 'Ringan')->count();
-                $sedang = $violationsForInd->where('tingkat_penilaian', 'Sedang')->count();
-                $berat = $violationsForInd->where('tingkat_penilaian', 'Berat')->count();
-
                 $score = 5;
-                if ($berat >= 1) $score = 1;
-                elseif ($sedang >= 1) $score = 2;
-                elseif ($ringan >= 2) $score = 3;
-                elseif ($ringan == 1) $score = 4;
+                foreach ($violations->where('kategori_indikator', $ind) as $violation) {
+                    $tingkat = $violation->tingkat_penilaian;
+                    $currentScore = 5;
+                    if (in_array($tingkat, ['Ringan 1 kali', 'Kurang rapi 1 kali', 'Terlambat 1 kali', 'Komplain ringan'])) {
+                        $currentScore = 4;
+                    } elseif (in_array($tingkat, ['Ringan 2 kali', 'Kurang rapi 2 kali', 'Terlambat 2 kali', 'Komplain sedang'])) {
+                        $currentScore = 3;
+                    } elseif (in_array($tingkat, ['Sedang', 'Seragam tidak lengkap', 'Tidak hadir dengan izin', 'Sering mendapat teguran'])) {
+                        $currentScore = 2;
+                    } elseif (in_array($tingkat, ['Berat', 'Penampilan tidak sesuai Standar', 'Mangkir / Alpha', 'Komplain berat'])) {
+                        $currentScore = 1;
+                    }
+                    if ($currentScore < $score) {
+                        $score = $currentScore;
+                    }
+                }
 
                 $scores[$ind] = $score;
                 $totalScore += $score;
@@ -542,6 +545,7 @@ class LaporanController extends Controller
                 'nama_lengkap' => $user->nama_lengkap,
                 'role' => $user->role,
                 'regu' => $user->regu,
+                'ttd_url' => $user->ttd_url,
             ],
         ]);
     }
@@ -594,6 +598,7 @@ class LaporanController extends Controller
                 'nama_lengkap' => $user->nama_lengkap,
                 'role' => $user->role,
                 'regu' => $user->regu,
+                'ttd_url' => $user->ttd_url,
             ],
         ]);
     }
@@ -609,29 +614,35 @@ class LaporanController extends Controller
         $role = $request->input('role');
         $signature = $request->input('signature');
 
-        if (preg_match('/^data:image\/(\w+);base64,/', $signature, $type)) {
-            $signatureData = substr($signature, strpos($signature, ',') + 1);
-            $type = strtolower($type[1]);
-
-            if (!in_array($type, ['jpg', 'jpeg', 'gif', 'png'])) {
-                return redirect()->back()->with('error', 'Format gambar tidak valid');
-            }
-
-            $signatureData = str_replace(' ', '+', $signatureData);
-            $signatureData = base64_decode($signatureData);
-
-            if ($signatureData === false) {
-                return redirect()->back()->with('error', 'Gagal decode base64');
-            }
+        $useSaved = $request->input('use_saved');
+        
+        if ($useSaved && $request->user() && $request->user()->ttd_url) {
+            $fileUrl = '/storage/' . $request->user()->ttd_url;
         } else {
-            return redirect()->back()->with('error', 'Format signature tidak valid');
+            if (preg_match('/^data:image\/(\w+);base64,/', $signature, $type)) {
+                $signatureData = substr($signature, strpos($signature, ',') + 1);
+                $type = strtolower($type[1]);
+
+                if (!in_array($type, ['jpg', 'jpeg', 'gif', 'png'])) {
+                    return redirect()->back()->with('error', 'Format gambar tidak valid');
+                }
+
+                $signatureData = str_replace(' ', '+', $signatureData);
+                $signatureData = base64_decode($signatureData);
+
+                if ($signatureData === false) {
+                    return redirect()->back()->with('error', 'Gagal decode base64');
+                }
+            } else {
+                return redirect()->back()->with('error', 'Format signature tidak valid');
+            }
+
+            $fileName = 'signature_' . $id . '_' . $role . '_' . time() . '.' . $type;
+            $path = 'signatures/' . $fileName;
+
+            \Illuminate\Support\Facades\Storage::disk('public')->put($path, $signatureData);
+            $fileUrl = '/storage/' . $path;
         }
-
-        $fileName = 'signature_' . $id . '_' . $role . '_' . time() . '.' . $type;
-        $path = 'signatures/' . $fileName;
-
-        \Illuminate\Support\Facades\Storage::disk('public')->put($path, $signatureData);
-        $fileUrl = '/storage/' . $path;
 
         if ($role === 'Danru') {
             $report->ttd_danru_url = $fileUrl;
@@ -662,29 +673,35 @@ class LaporanController extends Controller
         $role = $request->input('role');
         $signature = $request->input('signature');
 
-        if (preg_match('/^data:image\/(\w+);base64,/', $signature, $type)) {
-            $signatureData = substr($signature, strpos($signature, ',') + 1);
-            $type = strtolower($type[1]);
+        $useSaved = $request->input('use_saved');
 
-            if (!in_array($type, ['jpg', 'jpeg', 'gif', 'png'])) {
-                return redirect()->back()->with('error', 'Format gambar tidak valid');
-            }
-
-            $signatureData = str_replace(' ', '+', $signatureData);
-            $signatureData = base64_decode($signatureData);
-
-            if ($signatureData === false) {
-                return redirect()->back()->with('error', 'Gagal decode base64');
-            }
+        if ($useSaved && $request->user() && $request->user()->ttd_url) {
+            $fileUrl = '/storage/' . $request->user()->ttd_url;
         } else {
-            return redirect()->back()->with('error', 'Format signature tidak valid');
+            if (preg_match('/^data:image\/(\w+);base64,/', $signature, $type)) {
+                $signatureData = substr($signature, strpos($signature, ',') + 1);
+                $type = strtolower($type[1]);
+
+                if (!in_array($type, ['jpg', 'jpeg', 'gif', 'png'])) {
+                    return redirect()->back()->with('error', 'Format gambar tidak valid');
+                }
+
+                $signatureData = str_replace(' ', '+', $signatureData);
+                $signatureData = base64_decode($signatureData);
+
+                if ($signatureData === false) {
+                    return redirect()->back()->with('error', 'Gagal decode base64');
+                }
+            } else {
+                return redirect()->back()->with('error', 'Format signature tidak valid');
+            }
+
+            $fileName = 'signature_mingguan_' . $id . '_' . $role . '_' . time() . '.' . $type;
+            $path = 'signatures/' . $fileName;
+
+            \Illuminate\Support\Facades\Storage::disk('public')->put($path, $signatureData);
+            $fileUrl = '/storage/' . $path;
         }
-
-        $fileName = 'signature_mingguan_' . $id . '_' . $role . '_' . time() . '.' . $type;
-        $path = 'signatures/' . $fileName;
-
-        \Illuminate\Support\Facades\Storage::disk('public')->put($path, $signatureData);
-        $fileUrl = '/storage/' . $path;
 
         if ($role === 'Danru') {
             $report->ttd_danru_url = $fileUrl;
@@ -802,11 +819,7 @@ class LaporanController extends Controller
             $avgScore = $ind['count'] > 0 ? $ind['total'] / $ind['count'] : 5;
             $achievedPercentage = ($avgScore / 5) * 100;
             
-            $keterangan = 'Sangat buruk';
-            if ($achievedPercentage > 80) { $keterangan = 'Sangat baik'; }
-            elseif ($achievedPercentage > 60) { $keterangan = 'Baik'; }
-            elseif ($achievedPercentage > 40) { $keterangan = 'Cukup baik'; }
-            elseif ($achievedPercentage > 20) { $keterangan = 'Buruk'; }
+            $keterangan = $achievedPercentage >= 100 ? 'Tercapai' : 'Tidak tercapai';
 
             $perIndicator[] = [
                 'indikator' => $ind['name'],

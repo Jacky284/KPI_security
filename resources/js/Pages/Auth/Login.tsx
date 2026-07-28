@@ -23,7 +23,7 @@ export default function Login() {
         <div className="w-full max-w-md space-y-8">
           <div className="flex flex-col items-center">
             <div className="flex h-28 w-28 items-center justify-center mb-2">
-              <img src="/images/logo-login.png" alt="KPI Security Logo" className="object-contain w-full h-full" />
+              <img src="/images/logo-app.png" alt="KPI Security Logo" className="object-contain w-full h-full" />
             </div>
             <h2 className="mt-6 text-center text-2xl font-black tracking-tight text-foreground uppercase">
               Sistem PMS Security
@@ -77,7 +77,7 @@ export default function Login() {
               </form>
             </CardContent>
           </Card>
-          
+
           <div className="text-center text-[10px] text-muted-foreground uppercase tracking-widest mt-4">
             Secured Area &bull; Authorized Personnel Only
           </div>

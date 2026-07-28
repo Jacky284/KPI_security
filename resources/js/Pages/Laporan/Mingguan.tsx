@@ -80,6 +80,7 @@ interface CurrentUser {
   nama_lengkap: string;
   role: "Admin" | "Danru" | "Chief" | "Klien" | "Anggota";
   regu: string | null;
+  ttd_url?: string | null;
 }
 
 interface Props {
@@ -106,6 +107,11 @@ export default function LaporanMingguan({
 }: Props) {
   const [activeMingguanSignatures, setActiveMingguanSignatures] = useState<Record<number, string>>({});
   const [collapsedSignatureRegus, setCollapsedSignatureRegus] = useState<Record<string, boolean>>({});
+  const [collapsedPerformanceRegus, setCollapsedPerformanceRegus] = useState<Record<string, boolean>>({});
+
+  const togglePerformanceRegu = (regu: string) => {
+    setCollapsedPerformanceRegus(prev => ({ ...prev, [regu]: !prev[regu] }));
+  };
 
   const toggleSignatureRegu = (regu: string) => {
     setCollapsedSignatureRegus(prev => ({ ...prev, [regu]: !prev[regu] }));
@@ -129,7 +135,7 @@ export default function LaporanMingguan({
     if (regu) params.filter_regu = regu;
     router.get("/laporan/mingguan", params);
   };
-  const handleSaveMingguanSignature = (reportId: number, signature: string) => {
+  const handleSaveMingguanSignature = (reportId: number, signature: string, isUsingSaved: boolean = false) => {
     if (!signature) {
       alert("Harap tanda tangan terlebih dahulu.");
       return;
@@ -138,6 +144,7 @@ export default function LaporanMingguan({
     router.post(`/laporan/mingguan/${reportId}/sign`, {
       signature,
       role: currentUser.role,
+      use_saved: isUsingSaved
     }, {
       onSuccess: () => {
         setActiveMingguanSignatures(prev => {
@@ -192,6 +199,20 @@ export default function LaporanMingguan({
       return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
     }).map(regu => ({ regu, reports: groups[regu] }));
   }, [visibleLaporan]);
+
+  const groupedPerformance = React.useMemo(() => {
+    const groups: Record<string, typeof performanceData> = {};
+    performanceData.forEach((officer) => {
+      const reguName = officer.regu || "Tanpa Regu";
+      if (!groups[reguName]) groups[reguName] = [];
+      groups[reguName].push(officer);
+    });
+    return Object.keys(groups).sort((a, b) => {
+      if (a === "Tanpa Regu") return 1;
+      if (b === "Tanpa Regu") return -1;
+      return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+    }).map(regu => ({ regu, officers: groups[regu] }));
+  }, [performanceData]);
 
   return (
     <>
@@ -258,11 +279,6 @@ export default function LaporanMingguan({
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-2 md:border-l md:pl-4 md:ml-auto w-full md:w-auto">
-            <Button asChild variant="outline" size="sm" className={`w-full sm:w-auto bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200 ${!canExportMingguan ? 'pointer-events-none opacity-50' : ''}`}>
-              <a href={canExportMingguan ? `/export/laporan?type=excel&minggu_ke=${selectedMinggu}&bulan=${selectedBulan}&tahun=${selectedTahun}${filterRegu ? `&filter_regu=${filterRegu}` : ''}` : '#'} target={canExportMingguan ? "_blank" : undefined}>
-                Export Excel
-              </a>
-            </Button>
             <Button asChild variant="outline" size="sm" className={`w-full sm:w-auto bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 border-red-200 ${!canExportMingguan ? 'pointer-events-none opacity-50' : ''}`}>
               <a href={canExportMingguan ? `/export/laporan?type=pdf&minggu_ke=${selectedMinggu}&bulan=${selectedBulan}&tahun=${selectedTahun}${filterRegu ? `&filter_regu=${filterRegu}` : ''}` : '#'} target={canExportMingguan ? "_blank" : undefined}>
                 Export PDF
@@ -289,58 +305,67 @@ export default function LaporanMingguan({
               <table className="w-full text-left text-sm border-collapse">
                 <thead>
                   <tr className="border-b bg-muted/50 text-muted-foreground font-bold">
-                    <th className="p-3">Nama Anggota</th>
-                    <th className="p-3">Regu</th>
-                    <th className="p-3 text-center">Kedisiplinan</th>
+                    <th className="p-3 text-center">NO</th>
+                    <th className="p-3 text-left">NAMA PERSONEL</th>
+                    <th className="p-3 text-center">Disiplin Kerja</th>
+                    <th className="p-3 text-center">Penampilan & Kerapihan</th>
                     <th className="p-3 text-center">Kehadiran</th>
-                    <th className="p-3 text-center">Kerapihan</th>
-                    <th className="p-3 text-center">Komunikasi</th>
-                    <th className="p-3 text-center">Total Skor</th>
-                    <th className="p-3 text-center">Persentase</th>
+                    <th className="p-3 text-center">Komunikasi & Pelayanan</th>
+                    <th className="p-3 text-center">Total Nilai</th>
+                    <th className="p-3 text-center">% Nilai</th>
+                    <th className="p-3 text-center w-48">Keterangan</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {performanceData.length > 0 ? (
-                    performanceData.map((officer) => (
-                      <tr key={officer.id_user} className="border-b align-top hover:bg-muted/5">
-                        <td className="p-3 font-bold text-foreground">
-                          <div className="flex items-center gap-2">
-                            <span>{officer.nama_lengkap}</span>
-                            {officer.role === 'Danru' && (
-                              <span className="bg-destructive/15 text-destructive font-bold text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">Danru</span>
-                            )}
-                          </div>
-                          {officer.violations.length > 0 && (
-                            <div className="mt-1 text-[10px] text-destructive italic font-normal">
-                              Ada {officer.violations.length} pelanggaran
+                  {groupedPerformance.length > 0 ? (
+                    groupedPerformance.map((group) => (
+                      <React.Fragment key={group.regu}>
+                        <tr className="bg-muted/50 border-y">
+                          <td colSpan={9} className="py-2 px-3 font-bold text-left text-primary border-r shadow-sm">
+                            <div className="flex justify-between items-center cursor-pointer" onClick={() => togglePerformanceRegu(group.regu)}>
+                              <span>{group.regu}</span>
+                              <Button type="button" variant="ghost" size="icon" className="h-6 w-6 ml-2">
+                                {collapsedPerformanceRegus[group.regu] ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                              </Button>
                             </div>
-                          )}
-                        </td>
-                        <td className="p-3 font-semibold whitespace-nowrap">{officer.regu}</td>
-                        <td className="p-3 text-center">{officer.scores.Kedisiplinan ?? '-'}</td>
-                        <td className="p-3 text-center">
-                          <div>{officer.scores.Kehadiran ?? '-'}</div>
-                          {officer.total_hari_kerja !== undefined && officer.total_hari_kerja > 0 && (
-                            <div className="text-[10px] text-muted-foreground whitespace-nowrap">({officer.total_hari_kerja} hari kerja)</div>
-                          )}
-                        </td>
-                        <td className="p-3 text-center">{officer.scores.Kerapihan ?? '-'}</td>
-                        <td className="p-3 text-center">{officer.scores.Komunikasi ?? '-'}</td>
-                        <td className="p-3 text-center font-semibold">{officer.total_score ?? '-'}</td>
-                        <td className="p-3 text-center">
-                          {officer.percentage !== null ? (
-                            <span className={`px-2 py-0.5 text-xs font-black rounded border ${getScoreBadgeColor(officer.percentage)}`}>
-                              {officer.percentage}%
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </td>
-                      </tr>
+                          </td>
+                        </tr>
+                        {!collapsedPerformanceRegus[group.regu] && group.officers.map((officer, index) => (
+                          <tr key={officer.id_user} className="border-b align-top hover:bg-muted/5">
+                            <td className="p-3 text-center font-medium">{index + 1}</td>
+                            <td className="p-3 text-left font-medium">
+                              {officer.nama_lengkap} 
+                              {officer.role === 'Danru' && <span className="text-[10px] text-red-500 ml-1 font-bold">(DANRU)</span>}
+                            </td>
+                            <td className="p-3 text-center">{officer.scores?.['Disiplin Kerja'] ?? '-'}</td>
+                            <td className="p-3 text-center">{officer.scores?.['Penampilan & Kerapihan'] ?? '-'}</td>
+                            <td className="p-3 text-center">
+                              {officer.scores?.['Kehadiran'] ?? '-'}
+                              {officer.total_hari_kerja !== undefined && officer.total_hari_kerja > 0 && (
+                                <div className="text-[10px] text-muted-foreground">({officer.total_hari_kerja}h)</div>
+                              )}
+                            </td>
+                            <td className="p-3 text-center">{officer.scores?.['Komunikasi & Pelayanan'] ?? '-'}</td>
+                            <td className="p-3 text-center font-bold text-primary">{officer.total_score ?? '-'}</td>
+                            <td className="p-3 text-center">
+                              {officer.percentage !== null ? (
+                                <span className={`px-2 py-0.5 text-xs font-black rounded border ${getScoreBadgeColor(officer.percentage)}`}>
+                                  {officer.percentage}%
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-xs text-muted-foreground italic">
+                              {officer.violations.length > 0 ? `${officer.violations.length} pelanggaran` : '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={8} className="p-6 text-center text-muted-foreground italic">
+                      <td colSpan={9} className="p-6 text-center text-muted-foreground italic">
                         Tidak ada personil terjadwal.
                       </td>
                     </tr>
@@ -351,58 +376,67 @@ export default function LaporanMingguan({
 
             {/* Mobile View */}
             <div className="lg:hidden flex flex-col gap-4 p-2">
-              {performanceData.length > 0 ? (
-                performanceData.map((officer) => (
-                  <div key={officer.id_user} className="flex flex-col gap-3 p-4 border rounded-xl bg-card shadow-sm">
-                    <div className="flex justify-between items-start border-b pb-2">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="font-bold text-foreground text-sm">{officer.nama_lengkap}</div>
-                          {officer.role === 'Danru' && (
-                            <span className="bg-destructive/15 text-destructive font-bold text-[9px] px-1.5 py-0.5 rounded-full uppercase tracking-wider">Danru</span>
-                          )}
-                        </div>
-                        {officer.violations.length > 0 && (
-                          <div className="text-[10px] text-destructive italic font-normal mt-0.5">
-                            Ada {officer.violations.length} pelanggaran
+              {groupedPerformance.length > 0 ? (
+                groupedPerformance.map((group) => (
+                  <div key={group.regu} className="flex flex-col gap-3">
+                    <div 
+                      className="flex justify-between items-center bg-muted/50 p-3 rounded-lg border cursor-pointer shadow-sm"
+                      onClick={() => togglePerformanceRegu(group.regu)}
+                    >
+                      <span className="font-bold text-primary">{group.regu}</span>
+                      <Button type="button" variant="ghost" size="icon" className="h-6 w-6">
+                        {collapsedPerformanceRegus[group.regu] ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    
+                    {!collapsedPerformanceRegus[group.regu] && group.officers.map((officer) => (
+                      <div key={officer.id_user} className="flex flex-col gap-3 p-4 border rounded-xl bg-card shadow-sm ml-2">
+                        <div className="flex justify-between items-start border-b pb-2">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <div className="font-bold text-foreground text-sm">{officer.nama_lengkap}</div>
+                              {officer.role === 'Danru' && (
+                                <span className="bg-destructive/15 text-destructive font-bold text-[9px] px-1.5 py-0.5 rounded-full uppercase tracking-wider">Danru</span>
+                              )}
+                            </div>
+                            {officer.violations.length > 0 && (
+                              <div className="text-[10px] text-destructive italic font-normal mt-0.5">
+                                Ada {officer.violations.length} pelanggaran
+                              </div>
+                            )}
+                            <span className="inline-block mt-1 bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] font-bold uppercase">{officer.regu}</span>
                           </div>
-                        )}
-                        <span className="inline-block mt-1 bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] font-bold uppercase">{officer.regu}</span>
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="text-xs text-muted-foreground font-semibold">Skor: {officer.total_score ?? '-'}</span>
-                        {officer.percentage !== null ? (
-                          <span className={`px-2 py-0.5 text-[10px] font-black rounded border ${getScoreBadgeColor(officer.percentage)}`}>
-                            {officer.percentage}%
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">-</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-4 gap-2 text-center text-[10px] font-semibold text-muted-foreground mt-1">
-                      <div className="flex flex-col bg-muted/30 p-2 rounded-lg border">
-                        <span className="mb-1 truncate">Kedisiplinan</span>
-                        <span className="text-foreground text-xs">{officer.scores.Kedisiplinan ?? '-'}</span>
-                      </div>
-                      <div className="flex flex-col bg-muted/30 p-2 rounded-lg border">
-                        <span className="mb-1 truncate">Kehadiran</span>
-                        <div className="flex items-center gap-1">
-                          <span className="text-foreground text-xs">{officer.scores.Kehadiran ?? '-'}</span>
-                          {officer.total_hari_kerja !== undefined && officer.total_hari_kerja > 0 && (
-                            <span className="text-[9px] text-muted-foreground whitespace-nowrap">({officer.total_hari_kerja} hari kerja)</span>
-                          )}
+                          <div className="flex flex-col items-end gap-1">
+                            <span className="text-xs text-muted-foreground font-semibold">Skor: {officer.total_score ?? '-'}</span>
+                            {officer.percentage !== null ? (
+                              <span className={`px-2 py-0.5 text-[10px] font-black rounded border ${getScoreBadgeColor(officer.percentage)}`}>
+                                {officer.percentage}%
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">-</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-center text-[10px] font-semibold text-muted-foreground mt-1">
+                          <div className="flex flex-col text-muted-foreground bg-muted/30 p-2 rounded-md">
+                            <span className="mb-1 truncate">Disiplin Kerja</span>
+                            <span className="text-foreground text-xs">{officer.scores?.['Disiplin Kerja'] ?? '-'}</span>
+                          </div>
+                          <div className="flex flex-col text-muted-foreground bg-muted/30 p-2 rounded-md">
+                            <span className="mb-1 truncate">Penampilan</span>
+                            <span className="text-foreground text-xs">{officer.scores?.['Penampilan & Kerapihan'] ?? '-'}</span>
+                          </div>
+                          <div className="flex flex-col text-muted-foreground bg-muted/30 p-2 rounded-md">
+                            <span className="mb-1 truncate">Kehadiran</span>
+                            <span className="text-foreground text-xs">{officer.scores?.['Kehadiran'] ?? '-'}</span>
+                          </div>
+                          <div className="flex flex-col text-muted-foreground bg-muted/30 p-2 rounded-md">
+                            <span className="mb-1 truncate">Komunikasi</span>
+                            <span className="text-foreground text-xs">{officer.scores?.['Komunikasi & Pelayanan'] ?? '-'}</span>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex flex-col bg-muted/30 p-2 rounded-lg border">
-                        <span className="mb-1 truncate">Kerapihan</span>
-                        <span className="text-foreground text-xs">{officer.scores.Kerapihan ?? '-'}</span>
-                      </div>
-                      <div className="flex flex-col bg-muted/30 p-2 rounded-lg border">
-                        <span className="mb-1 truncate">Komunikasi</span>
-                        <span className="text-foreground text-xs">{officer.scores.Komunikasi ?? '-'}</span>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 ))
               ) : (
@@ -434,7 +468,6 @@ export default function LaporanMingguan({
                   <tr className="border-b bg-muted/50 text-muted-foreground font-bold">
                     <th className="p-3">Minggu Ke</th>
                     <th className="p-3">Periode</th>
-                    <th className="p-3">Regu</th>
                     <th className="p-3">Danru Pembuat</th>
                     <th className="p-3">Status</th>
                     <th className="p-3">Tanda Tangan Danru</th>
@@ -446,7 +479,7 @@ export default function LaporanMingguan({
                     groupedSignatures.map((group) => (
                       <React.Fragment key={group.regu}>
                         <tr className="bg-muted/50 border-y">
-                          <td colSpan={7} className="py-2 px-3 font-bold text-left text-primary border-r shadow-sm">
+                          <td colSpan={6} className="py-2 px-3 font-bold text-left text-primary border-r shadow-sm">
                             <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSignatureRegu(group.regu)}>
                               <span>{group.regu}</span>
                               <Button type="button" variant="ghost" size="icon" className="h-6 w-6 ml-2">
@@ -466,7 +499,6 @@ export default function LaporanMingguan({
                             <tr key={report.id_laporan_mingguan} className="border-b align-top hover:bg-muted/5">
                               <td className="p-3 font-bold text-foreground">Minggu {report.minggu_ke}</td>
                               <td className="p-3">{report.bulan} {report.tahun}</td>
-                              <td className="p-3 font-semibold whitespace-nowrap">{report.regu}</td>
                               <td className="p-3">{report.danru?.nama_lengkap || "-"}</td>
                               <td className="p-3">{getStatusBadge(report.status_dokumen)}</td>
 
@@ -479,7 +511,14 @@ export default function LaporanMingguan({
                                     <div className="min-w-[180px]">
                                       <SignaturePad
                                         label="Tanda Tangan Danru"
-                                        onConfirm={(data) => handleSaveMingguanSignature(report.id_laporan_mingguan, data)}
+                                        savedSignatureUrl={currentUser.ttd_url}
+                                        onConfirm={(base64, isUsingSaved) => {
+                                          router.post(`/laporan/mingguan/${report.id_laporan_mingguan}/sign`, { 
+                                            signature: base64, 
+                                            role: 'Danru',
+                                            use_saved: isUsingSaved
+                                          });
+                                        }}
                                       />
                                     </div>
                                   ) : (
@@ -498,7 +537,8 @@ export default function LaporanMingguan({
                                   <div className="min-w-[180px]">
                                     <SignaturePad
                                       label="Tanda Tangan Chief"
-                                      onConfirm={(data) => handleSaveMingguanSignature(report.id_laporan_mingguan, data)}
+                                      savedSignatureUrl={currentUser.ttd_url}
+                                      onConfirm={(data, isUsingSaved) => handleSaveMingguanSignature(report.id_laporan_mingguan, data, isUsingSaved)}
                                     />
                                   </div>
                                 ) : (
@@ -512,7 +552,7 @@ export default function LaporanMingguan({
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={7} className="p-6 text-center text-muted-foreground italic">
+                      <td colSpan={6} className="p-6 text-center text-muted-foreground italic">
                         Belum ada laporan mingguan.
                       </td>
                     </tr>
@@ -552,9 +592,6 @@ export default function LaporanMingguan({
                               <div className="text-sm">
                                 <span className="text-muted-foreground">Periode:</span> <span className="font-medium">{report.bulan} {report.tahun}</span>
                               </div>
-                              <div className="text-sm">
-                                <span className="text-muted-foreground">Regu:</span> <span className="font-medium">{report.regu}</span>
-                              </div>
                               <div className="text-sm border-b pb-2">
                                 <span className="text-muted-foreground">Danru Pembuat:</span> <span className="font-medium">{report.danru?.nama_lengkap || "-"}</span>
                               </div>
@@ -567,7 +604,8 @@ export default function LaporanMingguan({
                                   isSignable ? (
                                     <SignaturePad
                                       label="Tanda Tangan Danru"
-                                      onConfirm={(data) => handleSaveMingguanSignature(report.id_laporan_mingguan, data)}
+                                      savedSignatureUrl={currentUser.ttd_url}
+                                      onConfirm={(data, isUsingSaved) => handleSaveMingguanSignature(report.id_laporan_mingguan, data, isUsingSaved)}
                                     />
                                   ) : (
                                     <span className="text-xs text-muted-foreground italic font-semibold">(Terkunci hingga minggu berakhir)</span>
@@ -584,7 +622,8 @@ export default function LaporanMingguan({
                                 ) : canChiefSign ? (
                                   <SignaturePad
                                     label="Tanda Tangan Chief"
-                                    onConfirm={(data) => handleSaveMingguanSignature(report.id_laporan_mingguan, data)}
+                                    savedSignatureUrl={currentUser.ttd_url}
+                                    onConfirm={(data, isUsingSaved) => handleSaveMingguanSignature(report.id_laporan_mingguan, data, isUsingSaved)}
                                   />
                                 ) : (
                                   <span className="text-xs text-muted-foreground italic">Menunggu...</span>

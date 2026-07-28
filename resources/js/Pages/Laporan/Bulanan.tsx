@@ -80,6 +80,7 @@ interface CurrentUser {
   nama_lengkap: string;
   role: "Admin" | "Danru" | "Chief" | "Klien" | "Anggota";
   regu: string | null;
+  ttd_url?: string | null;
 }
 
 interface Props {
@@ -119,7 +120,7 @@ export default function LaporanBulanan({
     router.get("/laporan/bulanan", params);
   };
 
-  const handleSaveSignature = (reportId: number, signature: string) => {
+  const handleSaveSignature = (reportId: number, signature: string, isUsingSaved: boolean = false) => {
     if (!signature) {
       alert("Harap tanda tangan terlebih dahulu.");
       return;
@@ -128,6 +129,7 @@ export default function LaporanBulanan({
     router.post(`/laporan/${reportId}/sign`, {
       signature,
       role: currentUser.role,
+      use_saved: isUsingSaved
     }, {
       onSuccess: () => {
         setActiveSignatures(prev => {
@@ -189,6 +191,23 @@ export default function LaporanBulanan({
               {currentUser.regu ? ` - ${currentUser.regu}` : ""})
             </p>
           </div>
+
+          {currentUser.role === "Chief" && (
+            <div className="flex bg-muted/50 p-1 rounded-lg w-fit">
+              <button 
+                onClick={() => setActiveTab("anggota")} 
+                className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${activeTab === "anggota" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Laporan Anggota
+              </button>
+              <button 
+                onClick={() => setActiveTab("danru")} 
+                className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${activeTab === "danru" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Laporan Danru
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Filters */}
@@ -219,11 +238,6 @@ export default function LaporanBulanan({
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-2 md:border-l md:pl-4 md:ml-auto w-full md:w-auto">
-            <Button asChild variant="outline" size="sm" className={`w-full sm:w-auto bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200 ${!canExportBulanan ? 'pointer-events-none opacity-50' : ''}`}>
-              <a href={canExportBulanan ? `/export/laporan-bulanan?type=excel&bulan=${selectedBulan}&tahun=${selectedTahun}${filterRegu ? `&filter_regu=${filterRegu}` : ''}${activeTab === 'danru' ? '&jenis=danru' : ''}` : '#'} target={canExportBulanan ? "_blank" : undefined}>
-                Export Excel
-              </a>
-            </Button>
             <Button asChild variant="outline" size="sm" className={`w-full sm:w-auto bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 border-red-200 ${!canExportBulanan ? 'pointer-events-none opacity-50' : ''}`}>
               <a href={canExportBulanan ? `/export/laporan-bulanan?type=pdf&bulan=${selectedBulan}&tahun=${selectedTahun}${filterRegu ? `&filter_regu=${filterRegu}` : ''}${activeTab === 'danru' ? '&jenis=danru' : ''}` : '#'} target={canExportBulanan ? "_blank" : undefined}>
                 Export PDF
@@ -232,22 +246,7 @@ export default function LaporanBulanan({
           </div>
         </div>
 
-        {currentUser.role === "Chief" && (
-          <div className="flex bg-muted/50 p-1 rounded-lg w-fit">
-            <button 
-              onClick={() => setActiveTab("anggota")} 
-              className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${activeTab === "anggota" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              Laporan Anggota
-            </button>
-            <button 
-              onClick={() => setActiveTab("danru")} 
-              className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${activeTab === "danru" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              Laporan Danru
-            </button>
-          </div>
-        )}
+
 
         {/* Section 3: Monthly Approval Workflow */}
         <Card className="shadow-xs border mt-2">
@@ -300,7 +299,8 @@ export default function LaporanBulanan({
                                   <div className="min-w-[180px]">
                                     <SignaturePad
                                       label="Tanda Tangan Chief"
-                                      onConfirm={(data) => handleSaveSignature(report.id_laporan_bulanan, data)}
+                                      savedSignatureUrl={currentUser.ttd_url}
+                                      onConfirm={(data, isUsingSaved) => handleSaveSignature(report.id_laporan_bulanan, data, isUsingSaved)}
                                     />
                                   </div>
                                 ) : (
@@ -320,7 +320,8 @@ export default function LaporanBulanan({
                                   <div className="min-w-[180px]">
                                     <SignaturePad
                                       label="Tanda Tangan Klien"
-                                      onConfirm={(data) => handleSaveSignature(report.id_laporan_bulanan, data)}
+                                      savedSignatureUrl={currentUser.ttd_url}
+                                      onConfirm={(data, isUsingSaved) => handleSaveSignature(report.id_laporan_bulanan, data, isUsingSaved)}
                                     />
                                   </div>
                                 ) : (
@@ -365,7 +366,8 @@ export default function LaporanBulanan({
                                 ) : canChiefSign ? (
                                   <SignaturePad
                                     label="Tanda Tangan Chief"
-                                    onConfirm={(data) => handleSaveSignature(report.id_laporan_bulanan, data)}
+                                    savedSignatureUrl={currentUser.ttd_url}
+                                    onConfirm={(data, isUsingSaved) => handleSaveSignature(report.id_laporan_bulanan, data, isUsingSaved)}
                                   />
                                 ) : (
                                   <span className="text-xs text-muted-foreground italic">
@@ -383,7 +385,8 @@ export default function LaporanBulanan({
                                 ) : canKlienSign ? (
                                   <SignaturePad
                                     label="Tanda Tangan Klien"
-                                    onConfirm={(data) => handleSaveSignature(report.id_laporan_bulanan, data)}
+                                    savedSignatureUrl={currentUser.ttd_url}
+                                    onConfirm={(data, isUsingSaved) => handleSaveSignature(report.id_laporan_bulanan, data, isUsingSaved)}
                                   />
                                 ) : (
                                   <span className="text-xs text-muted-foreground italic">Menunggu...</span>

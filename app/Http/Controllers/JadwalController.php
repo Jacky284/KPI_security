@@ -84,24 +84,6 @@ class JadwalController extends Controller
         // ... (This can be an API endpoint or part of LaporanController@dashboard)
     }
 
-    public function exportMingguan(Request $request)
-    {
-        $user = Auth::user();
-        $type = $request->query('type', 'pdf');
-        
-        $startDateParam = $request->query('start_date', \Carbon\Carbon::now()->startOfWeek()->format('Y-m-d'));
-        
-        if ($type === 'excel') {
-            return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\JadwalMingguanExport($startDateParam), "jadwal_mingguan_{$startDateParam}.xlsx");
-        } else if ($type === 'pdf') {
-            $export = new \App\Exports\JadwalMingguanExport($startDateParam);
-            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.jadwal_mingguan', $export->view()->getData())
-                ->setPaper('a4', 'landscape');
-            return $pdf->stream("jadwal_mingguan_{$startDateParam}.pdf");
-        }
-
-        return redirect()->back()->with('error', 'Tipe export tidak valid');
-    }
 
     public function exportBulanan(Request $request)
     {

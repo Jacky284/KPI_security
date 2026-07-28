@@ -121,7 +121,9 @@ class AnggotaController extends Controller
         $reqTahun = request('tahun', $currentYear);
         
         $monthsArr = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-        $defaultIndicators = ['Kedisiplinan', 'Kehadiran', 'Kerapihan', 'Komunikasi'];
+        $defaultIndicators = $anggota->role === 'Danru'
+            ? ['Pengawasan Personel', 'Ketepatan Pelaporan', 'Penyelesaian Masalah']
+            : ['Disiplin Kerja', 'Kehadiran', 'Penampilan & Kerapihan', 'Komunikasi & Pelayanan'];
         
         if ($reqBulan && in_array($reqBulan, $monthsArr)) {
             $awalBulanNum = array_search($reqBulan, $monthsArr) + 1;
@@ -156,9 +158,19 @@ class AnggotaController extends Controller
                 $deduction = 0;
                 foreach ($violationsThisMonth as $v) {
                     if ($v->kategori_indikator === $ind) {
-                        $penalty = 5;
-                        if ($v->tingkat_penilaian === 'Sedang') $penalty = 10;
-                        if ($v->tingkat_penilaian === 'Berat') $penalty = 25;
+                        $tingkat = $v->tingkat_penilaian;
+                        $penalty = 0;
+                        if (in_array($tingkat, ['Ringan 1 kali', 'Kurang rapi 1 kali', 'Terlambat 1 kali', 'Komplain ringan'])) {
+                            $penalty = 20;
+                        } elseif (in_array($tingkat, ['Ringan 2 kali', 'Kurang rapi 2 kali', 'Terlambat 2 kali', 'Komplain sedang'])) {
+                            $penalty = 40;
+                        } elseif (in_array($tingkat, ['Sedang', 'Seragam tidak lengkap', 'Tidak hadir dengan izin', 'Sering mendapat teguran'])) {
+                            $penalty = 60;
+                        } elseif (in_array($tingkat, ['Berat', 'Penampilan tidak sesuai Standar', 'Mangkir / Alpha', 'Komplain berat'])) {
+                            $penalty = 80;
+                        } elseif (preg_match('/Skor (\d+)/', $tingkat, $matches)) {
+                            $penalty = (5 - (int)$matches[1]) * 20;
+                        }
                         $deduction += $penalty;
                     }
                 }
@@ -185,7 +197,9 @@ class AnggotaController extends Controller
         $indicatorHasPagi = [];
         $indicatorHasMalam = [];
 
-        $defaultIndicators = ['Kedisiplinan', 'Kehadiran', 'Kerapihan', 'Komunikasi'];
+        $defaultIndicators = $anggota->role === 'Danru'
+            ? ['Pengawasan Personel', 'Ketepatan Pelaporan', 'Penyelesaian Masalah']
+            : ['Kedisiplinan', 'Kehadiran', 'Kerapihan', 'Komunikasi'];
         foreach ($defaultIndicators as $ind) {
             $indicatorDeductionPagi[$ind] = 0;
             $indicatorDeductionMalam[$ind] = 0;
@@ -298,5 +312,45 @@ class AnggotaController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Anggota berhasil dipindahkan ke ' . $request->regu);
+    }
+    public function saveSignature(Request $request, $id)
+    {
+        $user = Auth::user();
+        
+        // Ensure user is updating their own signature, or admin/chief
+        if ($user->id_user != $id && !in_array($user->role, ['Admin', 'Chief'])) {
+            abort(403, 'Akses ditolak.');
+        }
+
+        $request->validate([
+            'signature' => 'required|string'
+        ]);
+
+        $anggota = User::findOrFail($id);
+
+        try {
+            $imageParts = explode(';base64,', $request->signature);
+            if (count($imageParts) !== 2) {
+                return redirect()->back()->with('error', 'Format tanda tangan tidak valid.');
+            }
+            
+            $imageTypeAux = explode('image/', $imageParts[0]);
+            $imageType = $imageTypeAux[1];
+            $imageBase64 = base64_decode($imageParts[1]);
+            
+            $fileName = 'ttd_' . $anggota->id_user . '_' . time() . '.' . $imageType;
+            $path = 'ttd_pribadi/' . $fileName;
+
+            \Illuminate\Support\Facades\Storage::disk('public')->put($path, $imageBase64);
+
+            // Update user
+            $anggota->update([
+                'ttd_url' => $path
+            ]);
+
+            return redirect()->back()->with('success', 'Tanda tangan berhasil disimpan.');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Gagal menyimpan tanda tangan.');
+        }
     }
 }

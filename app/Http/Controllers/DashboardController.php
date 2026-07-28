@@ -15,7 +15,7 @@ class DashboardController extends Controller
         $role = strtolower(trim($user->role));
 
         if ($role === 'chief' || $role === 'admin') {
-            // Dashboard for Chief/Admin: Show Danrus and their weekly report status for the current month
+            // Dashboard for Chief/Admin: Show Danrus and their weekly report status for H-1 month and current month
             $danrus = User::where('role', 'Danru')->where('status_aktif', 1)->orderBy('regu', 'asc')->orderBy('nama_lengkap', 'asc')->get();
             
             $now = \Carbon\Carbon::now();
@@ -24,52 +24,69 @@ class DashboardController extends Controller
                 5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
                 9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
             ];
-            $currentBulan = $defaultBulanMap[$now->month];
-            $currentTahun = $now->year;
             
-            $laporan = \App\Models\LaporanMingguan::where('bulan', $currentBulan)
-                        ->where('tahun', $currentTahun)
-                        ->get()
-                        ->groupBy('id_danru');
+            $monthsToDisplay = [
+                $now->copy()->subMonth(),
+                $now->copy(),
+            ];
 
-            $danruData = [];
-            
-            $bulanNum = str_pad($now->month, 2, '0', STR_PAD_LEFT);
-            $firstDayOfMonth = \Carbon\Carbon::createFromDate($currentTahun, $bulanNum, 1);
-            $daysInMonth = $firstDayOfMonth->daysInMonth;
-            $firstDayIso = $firstDayOfMonth->dayOfWeekIso;
+            $monthStatusList = [];
 
-            foreach ($danrus as $danru) {
-                $danruLaporan = $laporan->get($danru->id_user, collect());
-                $mingguanStatus = [];
-                for ($i = 1; $i <= 6; $i++) {
-                    $totalWeeks = 4; // Fix to 4 weeks
-                    if ($i > $totalWeeks) {
-                        $mingguanStatus["minggu_$i"] = 'Not_Available';
-                        continue;
+            foreach ($monthsToDisplay as $dateObj) {
+                $mMonth = $dateObj->month;
+                $mTahun = $dateObj->year;
+                $mBulanStr = $defaultBulanMap[$mMonth];
+                $mBulanNum = str_pad($mMonth, 2, '0', STR_PAD_LEFT);
+
+                $laporan = \App\Models\LaporanMingguan::where('bulan', $mBulanStr)
+                            ->where('tahun', $mTahun)
+                            ->get()
+                            ->groupBy('id_danru');
+
+                $danruData = [];
+                foreach ($danrus as $danru) {
+                    $danruLaporan = $laporan->get($danru->id_user, collect());
+                    $mingguanStatus = [];
+                    for ($i = 1; $i <= 6; $i++) {
+                        $totalWeeks = 4; // Fix to 4 weeks
+                        if ($i > $totalWeeks) {
+                            $mingguanStatus["minggu_$i"] = 'Not_Available';
+                            continue;
+                        }
+
+                        $startOfWeek1 = \App\Http\Controllers\LaporanController::getStartOfWeek1($mTahun, $mBulanNum);
+                        $endOfWeekDate = $startOfWeek1->copy()->addDays(($i - 1) * 7 + 6)->endOfDay();
+                        $isPassed = $now->gt($endOfWeekDate);
+
+                        $lap = $danruLaporan->firstWhere('minggu_ke', $i);
+                        $statusDokumen = $lap ? $lap->status_dokumen : 'Draft';
+                        
+                        if (in_array($statusDokumen, ['Review_Chief', 'Review_Klien', 'Approved'])) {
+                            $mingguanStatus["minggu_$i"] = 'Signed';
+                        } else {
+                            $mingguanStatus["minggu_$i"] = $isPassed ? 'Unsigned' : 'Pending';
+                        }
                     }
-
-                    $startOfWeek1 = \App\Http\Controllers\LaporanController::getStartOfWeek1($currentTahun, $bulanNum);
-                    $endOfWeekDate = $startOfWeek1->copy()->addDays(($i - 1) * 7 + 6)->endOfDay();
-                    $isPassed = $now->gt($endOfWeekDate);
-
-                    $lap = $danruLaporan->firstWhere('minggu_ke', $i);
-                    $statusDokumen = $lap ? $lap->status_dokumen : 'Draft';
                     
-                    if (in_array($statusDokumen, ['Review_Chief', 'Review_Klien', 'Approved'])) {
-                        $mingguanStatus["minggu_$i"] = 'Signed';
-                    } else {
-                        $mingguanStatus["minggu_$i"] = $isPassed ? 'Unsigned' : 'Pending';
-                    }
+                    $danruData[] = [
+                        'id_user' => $danru->id_user,
+                        'nama_lengkap' => $danru->nama_lengkap,
+                        'regu' => $danru->regu,
+                        'mingguan_status' => $mingguanStatus,
+                    ];
                 }
-                
-                $danruData[] = [
-                    'id_user' => $danru->id_user,
-                    'nama_lengkap' => $danru->nama_lengkap,
-                    'regu' => $danru->regu,
-                    'mingguan_status' => $mingguanStatus,
+
+                $monthStatusList[] = [
+                    'bulan' => $mBulanStr,
+                    'tahun' => $mTahun,
+                    'danrus' => $danruData,
+                    'isCurrentMonth' => ($mMonth === $now->month && $mTahun === $now->year),
                 ];
             }
+
+            $currentBulan = $defaultBulanMap[$now->month];
+            $currentTahun = $now->year;
+            $latestDanruData = end($monthStatusList)['danrus'];
 
             return Inertia::render('Dashboard/Index', [
                 'currentUser' => [
@@ -77,7 +94,8 @@ class DashboardController extends Controller
                     'role' => $user->role,
                     'regu' => trim($user->regu),
                 ],
-                'danrus' => $danruData,
+                'danrus' => $latestDanruData,
+                'monthStatusList' => $monthStatusList,
                 'currentBulan' => $currentBulan,
                 'currentTahun' => $currentTahun,
             ]);

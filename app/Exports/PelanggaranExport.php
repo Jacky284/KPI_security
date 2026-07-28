@@ -23,7 +23,7 @@ class PelanggaranExport implements FromView, ShouldAutoSize
 
     public function view(): View
     {
-        return view('exports.daftar_pelanggaran', [
+        return view('exports.daftar_penilaian', [
             'pelanggaran' => $this->pelanggaran,
             'bulan' => $this->bulan,
             'tahun' => $this->tahun,

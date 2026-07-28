@@ -96,7 +96,7 @@ export const sidebarItems: NavGroup[] = [
       },
       {
         id: "input-pelanggaran",
-        title: "Input Penilaian",
+        title: "Input Pelanggaran",
         url: "/pelanggaran",
         icon: ListTodo,
       },
@@ -108,7 +108,7 @@ export const sidebarItems: NavGroup[] = [
     items: [
       {
         id: "daftar-pelanggaran",
-        title: "Daftar Penilaian",
+        title: "Daftar Pelanggaran",
         url: "/pelanggaran/daftar",
         icon: CheckSquare,
       },

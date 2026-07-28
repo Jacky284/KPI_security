@@ -43,6 +43,7 @@ class HandleInertiaRequests extends Middleware
                     'nama_lengkap' => $request->user()->nama_lengkap,
                     'role' => $request->user()->role,
                     'regu' => $request->user()->regu,
+                    'ttd_url' => $request->user()->ttd_url,
                 ] : null,
             ],
             'flash' => [

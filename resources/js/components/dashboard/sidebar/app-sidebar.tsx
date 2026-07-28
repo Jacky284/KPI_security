@@ -83,10 +83,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   });
 
   const loggedInUser = user ? {
+    id_user: user.id_user,
     name: user.nama_lengkap,
     email: user.role + (user.regu ? ` - ${user.regu}` : ''),
     avatar: '',
   } : {
+    id_user: 0,
     name: 'Guest',
     email: 'Guest',
     avatar: '',
@@ -100,10 +102,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link prefetch={false} href="/" className="flex items-center gap-2">
-                <img src="/images/logo-app.png" alt="Logo" className="w-10 h-10 object-contain" />
-                <span className="font-semibold text-base">KPI Security</span>
+            <SidebarMenuButton size="lg" asChild className="h-12 px-2">
+              <Link prefetch={false} href="/" className="flex items-center gap-2.5">
+                <div className="flex items-center justify-center shrink-0 w-9 h-9">
+                  <img src="/images/logo-app.png" alt="Logo" className="w-full h-full object-contain" />
+                </div>
+                <span className="font-bold text-base tracking-tight">KPI Security</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

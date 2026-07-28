@@ -185,33 +185,37 @@ class PelanggaranController extends Controller
     {
         $user = Auth::user();
         $type = $request->query('type', 'pdf');
+        $jenis = $request->query('jenis', 'anggota');
         $bulan = $request->query('bulan', 'Juli');
         $tahun = (int)$request->query('tahun', 2026);
         $minggu_ke = (int)$request->query('minggu_ke', 1);
         $filter_regu = $request->query('filter_regu');
 
-        $query = CatatanPelanggaran::with(['anggota:id_user,nama_lengkap,regu', 'danruPenilai:id_user,nama_lengkap'])
+        $query = CatatanPelanggaran::with(['anggota:id_user,nama_lengkap,regu,role', 'danruPenilai:id_user,nama_lengkap'])
             ->where('bulan', $bulan)
             ->where('tahun', $tahun)
             ->where('minggu_ke', $minggu_ke);
+
+        if ($jenis === 'danru') {
+            $query->whereHas('anggota', function ($q) {
+                $q->where('role', 'Danru');
+            });
+        } else {
+            $query->whereHas('anggota', function ($q) {
+                $q->where('role', '!=', 'Danru');
+            });
+        }
 
         if (strtolower(trim($user->role)) === 'danru') {
             $query->whereHas('anggota', function ($q) use ($user) {
                 $q->where('regu', trim($user->regu));
             });
-        } else if (strtolower(trim($user->role)) === 'chief') {
-            $query->whereHas('anggota', function ($q) {
-                $q->where('role', 'Danru');
-            });
+        } else if (strtolower(trim($user->role)) === 'chief' || strtolower(trim($user->role)) === 'admin') {
             if ($filter_regu) {
                 $query->whereHas('anggota', function ($q) use ($filter_regu) {
                     $q->where('regu', $filter_regu);
                 });
             }
-        } else if (strtolower(trim($user->role)) === 'admin' && $filter_regu) {
-            $query->whereHas('anggota', function ($q) use ($filter_regu) {
-                $q->where('regu', $filter_regu);
-            });
         }
 
         $pelanggaran = $query->orderBy('tanggal_penilaian', 'desc')->get();
@@ -219,17 +223,21 @@ class PelanggaranController extends Controller
         if ($type === 'excel') {
             return \Maatwebsite\Excel\Facades\Excel::download(
                 new \App\Exports\PelanggaranExport($pelanggaran, $bulan, $tahun, $minggu_ke), 
-                "catatan_pelanggaran_{$minggu_ke}_{$bulan}_{$tahun}.xlsx"
+                "catatan_pelanggaran_{$jenis}_{$minggu_ke}_{$bulan}_{$tahun}.xlsx"
             );
         } else if ($type === 'pdf') {
-            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.daftar_pelanggaran', [
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.daftar_penilaian', [
                 'pelanggaran' => $pelanggaran,
                 'bulan' => $bulan,
                 'tahun' => $tahun,
                 'minggu_ke' => $minggu_ke,
                 'filter_regu' => $filter_regu,
+                'jenis' => $jenis,
+                'userName' => $user->nama_lengkap ?? '-',
+                'userRole' => $user->role ?? 'PENILAI',
+                'userTtdUrl' => $user->ttd_url ?? null,
             ])->setPaper('a4', 'landscape');
-            return $pdf->stream("catatan_pelanggaran_{$minggu_ke}_{$bulan}_{$tahun}.pdf");
+            return $pdf->stream("catatan_pelanggaran_{$jenis}_{$minggu_ke}_{$bulan}_{$tahun}.pdf");
         }
 
         return redirect()->back()->with('error', 'Tipe export tidak valid');

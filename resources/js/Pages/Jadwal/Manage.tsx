@@ -3,7 +3,7 @@ import { Head, router, useForm } from "@inertiajs/react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp, Undo, Redo } from "lucide-react";
+import { ChevronDown, ChevronUp, Undo, Redo, RefreshCw } from "lucide-react";
 
 interface User {
   id_user: number;
@@ -90,6 +90,32 @@ export default function Manage({ anggotas, jadwals, bulan, tahun }: Props) {
     if (current === "Libur") return "Pagi";
     if (current === "Pagi") return "Malam";
     return "Libur";
+  };
+
+  const handleSyncDanru = () => {
+    const newJadwal = { ...data.jadwal };
+    const regus = [...new Set(anggotas.map(a => a.regu).filter(Boolean))];
+    
+    let hasChanges = false;
+    regus.forEach(regu => {
+      const danru = anggotas.find(a => a.regu === regu && a.role === 'Danru');
+      if (danru) {
+        const danruSchedule = newJadwal[danru.id_user];
+        if (danruSchedule) {
+          anggotas.forEach(anggota => {
+            if (anggota.regu === regu && anggota.role === 'Anggota') {
+              newJadwal[anggota.id_user] = { ...danruSchedule };
+              hasChanges = true;
+            }
+          });
+        }
+      }
+    });
+
+    if (hasChanges) {
+      setData("jadwal", newJadwal);
+      pushToHistory(newJadwal);
+    }
   };
 
   // --- Excel-like Drag to Fill Logic ---
@@ -378,29 +404,45 @@ export default function Manage({ anggotas, jadwals, bulan, tahun }: Props) {
         </div>
 
         <Card className="shadow-xs border-2">
-          <CardHeader className="bg-muted/30 border-b flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4">
-            <div>
-              <CardTitle className="text-md font-bold">Grid Jadwal</CardTitle>
-              <CardDescription>Klik/Drag sel untuk merubah jadwal. Jadwal Anggota akan otomatis mengikuti jadwal Danru di regunya.</CardDescription>
+          <CardHeader className="bg-muted/30 border-b flex flex-col md:flex-row md:items-end justify-between gap-3 px-4 pt-2 pb-3">
+            <div className="flex items-center gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">BULAN</label>
+                <select 
+                  value={selectedBulan} 
+                  onChange={e => handleBulanChange(e.target.value)}
+                  className="p-2 border rounded-md text-sm bg-background cursor-pointer"
+                >
+                  {Array.from({length: 12}, (_, i) => i + 1).map(m => (
+                    <option key={m} value={m.toString().padStart(2, '0')}>
+                      {new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' })}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">TAHUN</label>
+                <input 
+                  type="number" 
+                  value={selectedTahun}
+                  onChange={e => handleTahunChange(e.target.value)}
+                  className="p-2 border rounded-md text-sm w-24 bg-background"
+                />
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <select 
-                value={selectedBulan} 
-                onChange={e => handleBulanChange(e.target.value)}
-                className="p-1.5 border rounded text-sm bg-background cursor-pointer"
-              >
-                {Array.from({length: 12}, (_, i) => i + 1).map(m => (
-                  <option key={m} value={m.toString().padStart(2, '0')}>
-                    {new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' })}
-                  </option>
-                ))}
-              </select>
-              <input 
-                type="number" 
-                value={selectedTahun}
-                onChange={e => handleTahunChange(e.target.value)}
-                className="p-1.5 border rounded text-sm w-20 bg-background"
-              />
+
+            <div className="flex items-center gap-2 md:ml-auto self-end">
+              <Button asChild variant="outline" size="sm" className="bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200">
+                <a href={`/export/jadwal-bulanan?type=excel&bulan=${selectedBulan}&tahun=${selectedTahun}`} target="_blank">
+                  Export Excel
+                </a>
+              </Button>
+              <Button asChild variant="outline" size="sm" className="bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 border-red-200">
+                <a href={`/export/jadwal-bulanan?type=pdf&bulan=${selectedBulan}&tahun=${selectedTahun}`} target="_blank">
+                  Export PDF
+                </a>
+              </Button>
             </div>
           </CardHeader>
           <form onSubmit={submit} className="flex flex-col">
@@ -435,6 +477,9 @@ export default function Manage({ anggotas, jadwals, bulan, tahun }: Props) {
                 Tips: <b>Klik 1x</b> pada sel untuk mengubah Pagi/Malam/Libur secara cepat tanpa drag.
               </div>
               <div className="flex gap-2">
+                <Button type="button" variant="outline" size="icon" onClick={handleSyncDanru} title="Samakan jadwal Anggota dengan Danru">
+                  <RefreshCw className="w-4 h-4" />
+                </Button>
                 <Button type="button" variant="outline" size="icon" onClick={handleUndo} disabled={historyIndex <= 0} title="Undo">
                   <Undo className="w-4 h-4" />
                 </Button>

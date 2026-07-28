@@ -1,5 +1,6 @@
 import React from "react";
-import { Head, Link, router } from "@inertiajs/react";
+import { Head, Link, router, usePage } from "@inertiajs/react";
+import { toast } from "sonner";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -8,6 +9,7 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as
 import { MapPin, Calendar, Clock, Briefcase, FileWarning, ArrowLeft, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SignaturePad } from "@/components/SignaturePad";
 
 interface CatatanPelanggaran {
   id_catatan: number;
@@ -40,6 +42,7 @@ interface User {
   tanggal_lahir: string | null;
   foto_profil: string | null;
   sisa_cuti: number;
+  role?: string;
 }
 
 interface Props {
@@ -55,7 +58,9 @@ interface Props {
 }
 
 export default function Detail({ anggota, riwayatPelanggaran, jadwalBulanIni, trendData, indicatorTrendData, filters }: Props) {
-
+  const { auth } = usePage<any>().props;
+  const isSelf = auth?.user?.id_user === anggota.id_user;
+  const sigPadRef = React.useRef<{ clear: () => void }>(null);
 
   // Format Tanggal Lahir
   const formatDate = (dateStr: string | null) => {
@@ -85,7 +90,7 @@ export default function Detail({ anggota, riwayatPelanggaran, jadwalBulanIni, tr
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-primary tracking-tight">Profil & Kinerja Anggota</h1>
+            <h1 className="text-2xl font-bold text-primary tracking-tight">Detail Profil & Kinerja</h1>
             <p className="text-sm text-muted-foreground">Analisis performa, biodata, dan riwayat kedisiplinan.</p>
           </div>
         </div>
@@ -127,6 +132,35 @@ export default function Detail({ anggota, riwayatPelanggaran, jadwalBulanIni, tr
                 </div>
               </CardContent>
             </Card>
+            {isSelf && (
+              <Card className="shadow-sm border-blue-200">
+                <CardHeader className="pb-2 bg-blue-50/50">
+                  <CardTitle className="text-sm">Daftarkan Tanda Tangan</CardTitle>
+                  <CardDescription className="text-xs">
+                    Tanda tangan ini akan digunakan untuk Laporan Mingguan & Bulanan.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  <SignaturePad
+                    label="Tanda Tangan Anda"
+                    ref={sigPadRef}
+                    autoFill={true}
+                    savedSignatureUrl={auth?.user?.ttd_url}
+                    onConfirm={(base64) => {
+                      router.post(`/anggota/${anggota.id_user}/signature`, { signature: base64 }, {
+                        preserveScroll: true,
+                        onSuccess: () => {
+                          toast.success("Tanda tangan berhasil disimpan!");
+                        },
+                        onError: () => {
+                          toast.error("Gagal menyimpan tanda tangan.");
+                        }
+                      });
+                    }}
+                  />
+                </CardContent>
+              </Card>
+            )}
 
             <Link href={`/pelanggaran?id_anggota=${anggota.id_user}`}>
               <Button className="w-full" size="lg">
@@ -172,10 +206,20 @@ export default function Detail({ anggota, riwayatPelanggaran, jadwalBulanIni, tr
                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                       />
                       <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                      <Line type="monotone" dataKey="Kedisiplinan" name="Kedisiplinan" stroke="#0ea5e9" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                      <Line type="monotone" dataKey="Kehadiran" name="Kehadiran" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                      <Line type="monotone" dataKey="Kerapihan" name="Kerapihan" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                      <Line type="monotone" dataKey="Komunikasi" name="Komunikasi" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                      {anggota.role === 'Danru' ? (
+                        <>
+                          <Line type="monotone" dataKey="Pengawasan Personel" name="Pengawasan Personel" stroke="#0ea5e9" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                          <Line type="monotone" dataKey="Ketepatan Pelaporan" name="Ketepatan Pelaporan" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                          <Line type="monotone" dataKey="Penyelesaian Masalah" name="Penyelesaian Masalah" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                        </>
+                      ) : (
+                        <>
+                          <Line type="monotone" dataKey="Kedisiplinan" name="Kedisiplinan" stroke="#0ea5e9" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                          <Line type="monotone" dataKey="Kehadiran" name="Kehadiran" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                          <Line type="monotone" dataKey="Kerapihan" name="Kerapihan" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                          <Line type="monotone" dataKey="Komunikasi" name="Komunikasi" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                        </>
+                      )}
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
