@@ -211,7 +211,7 @@ class CatatanHarianController extends Controller
         }
         $totalPages = $chunks->count();
         
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.catatan_harian', [
+        $html = view('exports.catatan_harian', [
             'catatan' => $catatan,
             'chunks' => $chunks,
             'totalPages' => $totalPages,
@@ -224,12 +224,19 @@ class CatatanHarianController extends Controller
             'userName' => $user->nama_lengkap,
             'userTtdUrl' => $user->ttd_url,
             'regu' => $user->role === 'Danru' ? $user->regu : $filter_regu
-        ]);
-        
-        $pdf->setPaper('A4', 'landscape');
+        ])->render();
         
         $fileName = 'Catatan_Harian_' . ($user->role === 'Danru' ? $user->regu . '_' : '') . $bulan . '_' . $tahun . '_Mg' . $minggu_ke . '.pdf';
         
-        return $pdf->stream($fileName);
+        $pdfContent = \Spatie\Browsershot\Browsershot::html($html)
+            ->format('A4')
+            ->landscape()
+            ->showBackground()
+            ->margins(0, 0, 0, 0)
+            ->pdf();
+            
+        return response($pdfContent)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="' . $fileName . '"');
     }
 }

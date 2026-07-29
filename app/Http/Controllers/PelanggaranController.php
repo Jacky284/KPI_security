@@ -229,7 +229,7 @@ class PelanggaranController extends Controller
             }
             $totalPages = $chunks->count();
 
-            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.daftar_penilaian', [
+            $html = view('exports.daftar_penilaian', [
                 'pelanggaran' => $pelanggaran,
                 'chunks' => $chunks,
                 'totalPages' => $totalPages,
@@ -243,8 +243,20 @@ class PelanggaranController extends Controller
                 'userName' => $user->nama_lengkap ?? '-',
                 'userRole' => $user->role ?? 'PENILAI',
                 'userTtdUrl' => $user->ttd_url ?? null,
-            ])->setPaper('a4', 'landscape');
-            return $pdf->stream("catatan_pelanggaran_{$jenis}_{$bulan}_{$tahun}.pdf");
+            ])->render();
+            
+            $fileName = "catatan_pelanggaran_{$jenis}_{$bulan}_{$tahun}.pdf";
+            
+            $pdfContent = \Spatie\Browsershot\Browsershot::html($html)
+                ->format('A4')
+                ->landscape()
+                ->showBackground()
+                ->margins(0, 0, 0, 0)
+                ->pdf();
+                
+            return response($pdfContent)
+                ->header('Content-Type', 'application/pdf')
+                ->header('Content-Disposition', 'inline; filename="' . $fileName . '"');
         }
 
         return redirect()->back()->with('error', 'Tipe export tidak valid');

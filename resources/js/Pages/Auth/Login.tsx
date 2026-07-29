@@ -18,7 +18,7 @@ export default function Login() {
 
   return (
     <>
-      <Head title="Login - PMS Security" />
+      <Head title="KPI Security" />
       <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
         <div className="w-full max-w-md space-y-8">
           <div className="flex flex-col items-center">
@@ -26,7 +26,7 @@ export default function Login() {
               <img src="/images/logo-app.png" alt="KPI Security Logo" className="object-contain w-full h-full" />
             </div>
             <h2 className="mt-6 text-center text-2xl font-black tracking-tight text-foreground uppercase">
-              Sistem PMS Security
+              Sistem KPI Security
             </h2>
             <p className="mt-2 text-center text-xs text-muted-foreground">
               Silakan login untuk mengakses koordinasi & kinerja regu sekuriti
