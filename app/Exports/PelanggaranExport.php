@@ -13,7 +13,7 @@ class PelanggaranExport implements FromView, ShouldAutoSize
     protected $tahun;
     protected $minggu_ke;
 
-    public function __construct($pelanggaran, $bulan, $tahun, $minggu_ke)
+    public function __construct($pelanggaran, $bulan, $tahun, $minggu_ke = null)
     {
         $this->pelanggaran = $pelanggaran;
         $this->bulan = $bulan;

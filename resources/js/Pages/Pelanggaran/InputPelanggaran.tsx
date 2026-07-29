@@ -79,18 +79,25 @@ export default function InputPelanggaran({ anggota, jadwals, userRole }: Props) 
   const todayStr = today.toISOString().split("T")[0];
   const initialWeekDetails = calculateWeekNumber(todayStr);
 
+  const initialPerson = anggota.find(a => a.id_user.toString() === initialAnggotaId.toString());
+  const initialIsDanru = initialPerson?.role === 'Danru' || userRole === "Chief";
+
   const { data, setData, post, processing, errors, reset, wasSuccessful } = useForm({
     id_anggota: initialAnggotaId,
     tanggal_penilaian: todayStr,
     minggu_ke: initialWeekDetails.minggu_ke,
     bulan: initialWeekDetails.bulan,
     tahun: initialWeekDetails.tahun,
-    kategori_indikator: userRole === "Chief" ? "Pengawasan Personel" : "Disiplin Kerja",
-    tingkat_penilaian: userRole === "Chief" ? "Skor 4" : "Ringan 1 kali",
+    kategori_indikator: initialIsDanru ? "Pengawasan Personel" : "Disiplin Kerja",
+    tingkat_penilaian: initialIsDanru ? "Skor 4" : "Ringan 1 kali",
     deskripsi_penilaian: "",
   });
 
-  const categories = userRole === "Chief"
+  // Selected user & role check
+  const selectedUser = anggota.find(a => a.id_user.toString() === data.id_anggota.toString());
+  const isDanruSelected = selectedUser?.role === 'Danru';
+
+  const categories = isDanruSelected
     ? ["Pengawasan Personel", "Ketepatan Pelaporan", "Penyelesaian Masalah"]
     : [
         "Disiplin Kerja",
@@ -99,7 +106,7 @@ export default function InputPelanggaran({ anggota, jadwals, userRole }: Props) 
         "Komunikasi & Pelayanan"
       ];
 
-  const tingkatOptions: Record<string, string[]> = userRole === "Chief"
+  const tingkatOptions: Record<string, string[]> = isDanruSelected
     ? {
         "Pengawasan Personel": ["Skor 4", "Skor 3", "Skor 2", "Skor 1"],
         "Ketepatan Pelaporan": ["Skor 4", "Skor 3", "Skor 2", "Skor 1"],
@@ -111,6 +118,20 @@ export default function InputPelanggaran({ anggota, jadwals, userRole }: Props) 
         "Kehadiran": ["Terlambat 1 kali", "Terlambat 2 kali", "Tidak hadir dengan izin", "Mangkir / Alpha"],
         "Komunikasi & Pelayanan": ["Komplain ringan", "Komplain sedang", "Sering mendapat teguran", "Komplain berat"],
       };
+
+  const handleAnggotaChange = (id: string) => {
+    const person = anggota.find(a => a.id_user.toString() === id.toString());
+    const isDanru = person?.role === 'Danru';
+    const defaultCat = isDanru ? "Pengawasan Personel" : "Disiplin Kerja";
+    const defaultTingkat = isDanru ? "Skor 4" : "Ringan 1 kali";
+
+    setData({
+      ...data,
+      id_anggota: id,
+      kategori_indikator: defaultCat,
+      tingkat_penilaian: defaultTingkat,
+    });
+  };
 
   const getAvailableWeeks = (bulanStr: string, tahun: number) => {
     return [1, 2, 3, 4];
@@ -150,8 +171,6 @@ export default function InputPelanggaran({ anggota, jadwals, userRole }: Props) 
     "Juli", "Agustus", "September", "Oktober", "November", "Desember"
   ];
 
-  // Calculate selected Regu
-  const selectedUser = anggota.find(a => a.id_user.toString() === data.id_anggota.toString());
   const reguName = selectedUser?.regu || "-";
 
   // Calculate Shift based on selected user and date
@@ -184,21 +203,21 @@ export default function InputPelanggaran({ anggota, jadwals, userRole }: Props) 
           <p className="text-sm text-muted-foreground mt-1">Gunakan formulir ini untuk mencatat pelaporan indisipliner / pelanggaran anggota sekuriti demi perhitungan KPI bulanan.</p>
         </div>
         <Card className="shadow-md">
-          <CardContent className="pt-6">
+          <CardContent className="pt-0">
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               {/* Anggota Dropdown */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-sm font-semibold text-foreground">
-                  {userRole === "Chief" || userRole === "Admin" ? "Pilih Danru" : "Pilih Anggota"}
+                  {userRole === "Chief" ? "Pilih Danru" : userRole === "Admin" ? "Pilih Personel (Danru / Anggota)" : "Pilih Anggota"}
                 </label>
                 <select
                   value={data.id_anggota}
-                  onChange={(e) => setData("id_anggota", e.target.value)}
+                  onChange={(e) => handleAnggotaChange(e.target.value)}
                   className="w-full p-2.5 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                   required
                 >
                   <option value="">
-                    {userRole === "Chief" || userRole === "Admin" ? "-- Pilih Danru --" : "-- Pilih Anggota --"}
+                    {userRole === "Chief" ? "-- Pilih Danru --" : userRole === "Admin" ? "-- Pilih Personel --" : "-- Pilih Anggota --"}
                   </option>
                   {anggota.map((person) => (
                     <option key={person.id_user} value={person.id_user}>

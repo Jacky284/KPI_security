@@ -3,7 +3,7 @@ import { Head, router, useForm } from "@inertiajs/react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp, Undo, Redo, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronUp, Undo, Redo, RefreshCw, LayoutGrid, Smartphone, Sun, Moon, Coffee } from "lucide-react";
 
 interface User {
   id_user: number;
@@ -38,6 +38,12 @@ export default function Manage({ anggotas, jadwals, bulan, tahun }: Props) {
 
   const daysInMonth = new Date(parseInt(selectedTahun), parseInt(selectedBulan), 0).getDate();
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  const getDayName = (yearStr: string, monthStr: string, dayNum: number) => {
+    const date = new Date(parseInt(yearStr), parseInt(monthStr) - 1, dayNum);
+    const days = ['Mg', 'Sn', 'Sl', 'Rb', 'Km', 'Jm', 'Sb'];
+    return days[date.getDay()];
+  };
 
   const { data, setData, post, processing } = useForm({
     bulan: selectedBulan,
@@ -175,6 +181,21 @@ export default function Manage({ anggotas, jadwals, bulan, tahun }: Props) {
         }
       });
     }
+  };
+
+  const setAllShiftsForMember = (id_user: number, shiftType: "Pagi" | "Malam" | "Libur") => {
+    const newJadwal = JSON.parse(JSON.stringify(data.jadwal));
+    const targetUser = anggotas.find(a => a.id_user === id_user);
+    daysArray.forEach(d => {
+      if (targetUser) {
+        updateJadwalRecursive(newJadwal, targetUser, d.toString(), shiftType);
+      } else {
+        if (!newJadwal[id_user]) newJadwal[id_user] = {};
+        newJadwal[id_user][d.toString()] = shiftType;
+      }
+    });
+    setData("jadwal", newJadwal);
+    pushToHistory(newJadwal);
   };
 
   const handleCellClick = (rowIndex: number, colIndex: number, anggota: User, day: string, currentShift: string) => {
@@ -446,7 +467,128 @@ export default function Manage({ anggotas, jadwals, bulan, tahun }: Props) {
             </div>
           </CardHeader>
           <form onSubmit={submit} className="flex flex-col">
-            <CardContent className="p-0 overflow-x-auto select-none w-full max-w-[100vw]">
+            {/* Mobile View: Auto-shown on mobile/tablet (< lg) */}
+            <div className="p-3 sm:p-4 flex flex-col gap-4 bg-muted/10 block lg:hidden">
+              <div className="flex flex-wrap items-center justify-between p-2.5 bg-card border rounded-lg text-xs gap-2 shadow-xs">
+                <span className="font-semibold text-muted-foreground">Legenda Shift:</span>
+                <div className="flex gap-1.5 flex-wrap">
+                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 font-bold rounded border border-blue-200">P = Pagi</span>
+                  <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 font-bold rounded border border-indigo-200">M = Malam</span>
+                  <span className="px-2 py-0.5 bg-muted text-muted-foreground font-bold rounded border"> - = Libur</span>
+                </div>
+              </div>
+
+              {anggotas.length === 0 ? (
+                <div className="p-6 text-center text-muted-foreground bg-card border rounded-lg">
+                  Tidak ada anggota ditemukan.
+                </div>
+              ) : (
+                (() => {
+                  const grouped: Record<string, User[]> = {};
+                  anggotas.forEach((a) => {
+                    const r = a.regu || "Tanpa Regu";
+                    if (!grouped[r]) grouped[r] = [];
+                    grouped[r].push(a);
+                  });
+
+                  return Object.entries(grouped).map(([reguName, members]) => {
+                    const isCollapsed = collapsedRegus[reguName];
+
+                    return (
+                      <div key={`mobile-regu-group-${reguName}`} className="flex flex-col gap-3">
+                        {/* Regu Accordion Header */}
+                        <div 
+                          className="flex items-center justify-between p-3 bg-muted/60 border rounded-lg shadow-xs cursor-pointer select-none hover:bg-muted/80 transition-colors"
+                          onClick={() => setCollapsedRegus(prev => ({ ...prev, [reguName]: !prev[reguName] }))}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-primary text-sm">{reguName}</span>
+                            <span className="text-[11px] bg-background text-muted-foreground font-semibold px-2 py-0.5 rounded-full border">
+                              {members.length} Anggota
+                            </span>
+                          </div>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-7 w-7 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCollapsedRegus(prev => ({ ...prev, [reguName]: !prev[reguName] }));
+                            }}
+                          >
+                            {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                          </Button>
+                        </div>
+
+                        {/* Member Cards (hidden when collapsed) */}
+                        {!isCollapsed && members.map((anggota) => (
+                          <Card key={`mobile-user-${anggota.id_user}`} className="border shadow-xs">
+                            <div className="p-3 bg-muted/30 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                {anggota.role === 'Danru' && <span className="w-2.5 h-2.5 rounded-full bg-primary shrink-0" title="Danru" />}
+                                <span className="font-bold text-sm">{anggota.nama_lengkap}</span>
+                                <span className="text-xs text-muted-foreground bg-background px-2 py-0.5 rounded border">{reguName}</span>
+                                {anggota.role === 'Danru' && <span className="text-[10px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded">DANRU</span>}
+                              </div>
+
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase mr-1">Set All:</span>
+                                <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px] bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200" onClick={() => setAllShiftsForMember(anggota.id_user, 'Pagi')}>
+                                  Pagi
+                                </Button>
+                                <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px] bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200" onClick={() => setAllShiftsForMember(anggota.id_user, 'Malam')}>
+                                  Malam
+                                </Button>
+                                <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px] bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200" onClick={() => setAllShiftsForMember(anggota.id_user, 'Libur')}>
+                                  Libur
+                                </Button>
+                              </div>
+                            </div>
+
+                            <CardContent className="p-3">
+                              <div className="grid grid-cols-7 gap-1.5 text-center">
+                                {daysArray.map((day) => {
+                                  const shift = data.jadwal[anggota.id_user]?.[day.toString()] || "Libur";
+                                  const dayName = getDayName(selectedTahun, selectedBulan, day);
+                                  const isSunday = dayName === 'Mg';
+                                  
+                                  let btnStyle = "bg-background text-muted-foreground border-muted-foreground/30";
+                                  if (shift === "Pagi") btnStyle = "bg-blue-600 text-white font-bold border-blue-700 shadow-xs";
+                                  if (shift === "Malam") btnStyle = "bg-indigo-600 text-white font-bold border-indigo-700 shadow-xs";
+
+                                  return (
+                                    <button
+                                      key={day}
+                                      type="button"
+                                      onClick={() => {
+                                        const newVal = toggleShift(shift) as any;
+                                        const newJadwal = JSON.parse(JSON.stringify(data.jadwal));
+                                        updateJadwalRecursive(newJadwal, anggota, day.toString(), newVal);
+                                        setData("jadwal", newJadwal);
+                                        pushToHistory(newJadwal);
+                                      }}
+                                      className={`flex flex-col items-center justify-center p-1 rounded-md border text-xs transition-all active:scale-95 min-h-[46px] cursor-pointer ${btnStyle}`}
+                                    >
+                                      <span className={`text-[9px] ${isSunday ? 'text-red-400 font-bold' : 'opacity-80'}`}>{dayName}</span>
+                                      <span className="font-bold text-[11px]">{day}</span>
+                                      <span className="text-[10px] mt-0.5">{shift === "Libur" ? "-" : shift === "Pagi" ? "P" : "M"}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    );
+                  });
+                })()
+              )}
+            </div>
+
+            {/* Desktop View: Auto-shown on large screens (>= lg) */}
+            <CardContent className="p-0 overflow-x-auto select-none w-full max-w-[100vw] hidden lg:block">
               <div className="min-w-max lg:min-w-0 lg:w-full pb-4">
                 <table className="w-full text-xs text-center border-collapse table-auto lg:table-fixed">
                   <thead>

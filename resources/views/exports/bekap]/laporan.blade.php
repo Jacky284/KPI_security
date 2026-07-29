@@ -33,7 +33,35 @@
     </style>
 </head>
 <body>
+    @php
+        $bulanList = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+        $allRegus = collect($performanceData)->pluck('regu')->unique()->filter()->map(function($r) {
+            return preg_replace('/^regu\s*/i', '', trim($r));
+        })->values();
+        if ($allRegus->count() > 0) {
+            $reguDisplay = 'REGU ' . $allRegus->implode(', ');
+        } else {
+            $reguDisplay = isset($laporanMingguan) && $laporanMingguan->regu ? strtoupper($laporanMingguan->regu) : 'REGU 1';
+        }
+        $danruName = isset($laporanMingguan) && $laporanMingguan->danru ? $laporanMingguan->danru->nama_lengkap : '';
+        $dateObj = \Carbon\Carbon::now();
+        $tanggalRekap = $dateObj->format('d') . ' ' . strtoupper($bulanList[$dateObj->format('n') - 1]) . ' ' . $dateObj->format('Y');
+        $bulanText = isset($bulan) ? (is_numeric($bulan) ? $bulanList[$bulan-1] : $bulan) : $bulanList[date('n')-1];
 
+        $actualData = array_values($performanceData ?? []);
+
+        // DIBATASI 10 BARIS PER HALAMAN
+        $chunks = array_chunk($actualData, 10);
+        if (empty($chunks)) {
+            $chunks = [[]];
+        }
+        $totalPages = count($chunks);
+
+        $logoBase64 = '';
+        if (file_exists(public_path('images/logo-app.png'))) {
+            $logoBase64 = config('pdf_logo.base64');
+        }
+    @endphp
 
     @foreach($chunks as $pageIndex => $chunkData)
         <div style="{{ $pageIndex < $totalPages - 1 ? 'page-break-after: always;' : '' }}">

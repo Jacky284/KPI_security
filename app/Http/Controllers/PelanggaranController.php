@@ -120,17 +120,14 @@ class PelanggaranController extends Controller
         ];
         $defaultBulan = $defaultBulanMap[$now->month];
         $defaultTahun = $now->year;
-        $defaultMingguKe = \App\Http\Controllers\LaporanController::getWeekNumberForDate($now);
 
         $bulan = $request->input('bulan', $defaultBulan);
         $tahun = (int)$request->input('tahun', $defaultTahun);
-        $minggu_ke = (int)$request->input('minggu_ke', $defaultMingguKe);
         $filter_regu = $request->input('filter_regu');
 
         $query = CatatanPelanggaran::with(['anggota:id_user,nama_lengkap,regu,role', 'danruPenilai:id_user,nama_lengkap'])
             ->where('bulan', $bulan)
-            ->where('tahun', $tahun)
-            ->where('minggu_ke', $minggu_ke);
+            ->where('tahun', $tahun);
 
         if (strtolower(trim($user->role)) === 'danru') {
             $query->whereHas('anggota', function ($q) use ($user) {
@@ -156,7 +153,6 @@ class PelanggaranController extends Controller
             'userRole' => $user->role,
             'selectedBulan' => $bulan,
             'selectedTahun' => $tahun,
-            'selectedMinggu' => $minggu_ke,
             'filterRegu' => $filter_regu,
             'reguList' => $reguList,
         ]);
@@ -188,13 +184,11 @@ class PelanggaranController extends Controller
         $jenis = $request->query('jenis', 'anggota');
         $bulan = $request->query('bulan', 'Juli');
         $tahun = (int)$request->query('tahun', 2026);
-        $minggu_ke = (int)$request->query('minggu_ke', 1);
         $filter_regu = $request->query('filter_regu');
 
         $query = CatatanPelanggaran::with(['anggota:id_user,nama_lengkap,regu,role', 'danruPenilai:id_user,nama_lengkap'])
             ->where('bulan', $bulan)
-            ->where('tahun', $tahun)
-            ->where('minggu_ke', $minggu_ke);
+            ->where('tahun', $tahun);
 
         if ($jenis === 'danru') {
             $query->whereHas('anggota', function ($q) {
@@ -222,22 +216,35 @@ class PelanggaranController extends Controller
 
         if ($type === 'excel') {
             return \Maatwebsite\Excel\Facades\Excel::download(
-                new \App\Exports\PelanggaranExport($pelanggaran, $bulan, $tahun, $minggu_ke), 
-                "catatan_pelanggaran_{$jenis}_{$minggu_ke}_{$bulan}_{$tahun}.xlsx"
+                new \App\Exports\PelanggaranExport($pelanggaran, $bulan, $tahun), 
+                "catatan_pelanggaran_{$jenis}_{$bulan}_{$tahun}.xlsx"
             );
         } else if ($type === 'pdf') {
+            $tglRekap = \Carbon\Carbon::now()->translatedFormat('d F Y');
+            $reguName = $filter_regu ? $filter_regu : ($pelanggaran->count() > 0 ? $pelanggaran->pluck('anggota.regu')->unique()->filter()->implode(', ') : 'SEMUA REGU');
+            
+            $chunks = $pelanggaran->chunk(10);
+            if ($chunks->isEmpty()) {
+                $chunks = collect([collect([])]);
+            }
+            $totalPages = $chunks->count();
+
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.daftar_penilaian', [
                 'pelanggaran' => $pelanggaran,
+                'chunks' => $chunks,
+                'totalPages' => $totalPages,
+                'logoBase64' => config('pdf_logo.base64'),
+                'tglRekap' => $tglRekap,
+                'reguName' => $reguName,
                 'bulan' => $bulan,
                 'tahun' => $tahun,
-                'minggu_ke' => $minggu_ke,
                 'filter_regu' => $filter_regu,
                 'jenis' => $jenis,
                 'userName' => $user->nama_lengkap ?? '-',
                 'userRole' => $user->role ?? 'PENILAI',
                 'userTtdUrl' => $user->ttd_url ?? null,
             ])->setPaper('a4', 'landscape');
-            return $pdf->stream("catatan_pelanggaran_{$jenis}_{$minggu_ke}_{$bulan}_{$tahun}.pdf");
+            return $pdf->stream("catatan_pelanggaran_{$jenis}_{$bulan}_{$tahun}.pdf");
         }
 
         return redirect()->back()->with('error', 'Tipe export tidak valid');

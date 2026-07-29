@@ -205,8 +205,17 @@ class CatatanHarianController extends Controller
         $catatan = $query->orderBy('tanggal', 'desc')->get();
         $tanggalRekap = \Carbon\Carbon::now()->translatedFormat('d F Y');
         
+        $chunks = $catatan->chunk(10);
+        if ($chunks->isEmpty()) {
+            $chunks = collect([collect([])]);
+        }
+        $totalPages = $chunks->count();
+        
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.catatan_harian', [
             'catatan' => $catatan,
+            'chunks' => $chunks,
+            'totalPages' => $totalPages,
+            'logoBase64' => config('pdf_logo.base64'),
             'bulan' => $bulan,
             'tahun' => $tahun,
             'minggu_ke' => $minggu_ke,

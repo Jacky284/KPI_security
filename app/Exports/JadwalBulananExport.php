@@ -34,11 +34,28 @@ class JadwalBulananExport implements FromView, ShouldAutoSize
             ->get()
             ->keyBy('id_anggota');
 
+        $logoBase64 = config('pdf_logo.base64');
+        $reguName = $anggotas->pluck('regu')->unique()->filter()->implode(', ') ?: 'Semua Regu';
+        
+        $bulanMap = [
+            'Januari' => 1, 'Februari' => 2, 'Maret' => 3, 'April' => 4,
+            'Mei' => 5, 'Juni' => 6, 'Juli' => 7, 'Agustus' => 8,
+            'September' => 9, 'Oktober' => 10, 'November' => 11, 'Desember' => 12
+        ];
+        $bulanAngka = is_numeric($this->bulan) ? (int)$this->bulan : ($bulanMap[$this->bulan] ?? date('n'));
+        $daysInMonth = \Carbon\Carbon::createFromDate($this->tahun, $bulanAngka, 1)->daysInMonth;
+        $tanggalRekap = \Carbon\Carbon::now()->format('d M Y');
+
         return view('exports.jadwal_bulanan', [
             'anggotas' => $anggotas,
             'jadwals' => $jadwals,
             'bulan' => $this->bulan,
             'tahun' => $this->tahun,
+            'logoBase64' => $logoBase64,
+            'reguName' => $reguName,
+            'bulanAngka' => $bulanAngka,
+            'daysInMonth' => $daysInMonth,
+            'tanggalRekap' => $tanggalRekap,
         ]);
     }
 }

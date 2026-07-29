@@ -191,11 +191,21 @@ class LaporanController extends Controller
             $total = $indicatorTotals[$ind]['total'];
             $achievedPercentage = $max > 0 ? ($total / $max) * 100 : 0;
             
-            $ket = $achievedPercentage >= $targets[$ind] ? 'Tercapai' : 'Tidak tercapai';
+            if ($ind === 'Disiplin Kerja') {
+                $ket = $achievedPercentage > 95 ? 'Tercapai' : 'Tidak tercapai';
+                $targetText = '<span style="color: #2f855a;">> 95%</span>';
+            } elseif ($ind === 'Komunikasi & Pelayanan') {
+                $ket = $achievedPercentage >= 90 ? 'Tercapai' : 'Tidak tercapai';
+                $targetText = '<span style="color: #2f855a;">>= 90%</span>';
+            } else {
+                $ket = $achievedPercentage >= $targets[$ind] ? 'Tercapai' : 'Tidak tercapai';
+                $targetText = $targets[$ind] == 100 ? '100%' : '<span style="color: #2f855a;">>= ' . $targets[$ind] . '%</span>';
+            }
 
             $perIndicator[] = [
                 'indikator' => $ind,
                 'target' => $targets[$ind],
+                'target_text' => $targetText,
                 'achieved_percentage' => $achievedPercentage,
                 'keterangan' => $ket,
             ];
@@ -743,12 +753,40 @@ class LaporanController extends Controller
         if ($type === 'excel') {
             return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\LaporanExport($performanceData, $bulan, $tahun, $minggu_ke), "laporan_mingguan_{$minggu_ke}_{$bulan}_{$tahun}.xlsx");
         } else if ($type === 'pdf') {
+            $bulanList = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+            $allRegus = collect($performanceData)->pluck('regu')->unique()->filter()->map(function($r) {
+                return preg_replace('/^regu\s*/i', '', trim($r));
+            })->values();
+            if ($allRegus->count() > 0) {
+                $reguDisplay = 'REGU ' . $allRegus->implode(', ');
+            } else {
+                $reguDisplay = isset($laporanMingguan) && $laporanMingguan->regu ? strtoupper($laporanMingguan->regu) : 'REGU 1';
+            }
+            $danruName = isset($laporanMingguan) && $laporanMingguan->danru ? $laporanMingguan->danru->nama_lengkap : '';
+            $dateObj = \Carbon\Carbon::now();
+            $tanggalRekap = $dateObj->format('d') . ' ' . strtoupper($bulanList[$dateObj->format('n') - 1]) . ' ' . $dateObj->format('Y');
+            $bulanText = is_numeric($bulan) ? $bulanList[(int)$bulan-1] : $bulan;
+
+            $actualData = array_values($performanceData ?? []);
+            $chunks = array_chunk($actualData, 10);
+            if (empty($chunks)) {
+                $chunks = [[]];
+            }
+            $totalPages = count($chunks);
+
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.laporan', [
                 'performanceData' => $performanceData,
                 'laporanMingguan' => $laporanMingguan,
                 'bulan' => $bulan,
                 'tahun' => $tahun,
                 'minggu_ke' => $minggu_ke,
+                'reguDisplay' => $reguDisplay,
+                'danruName' => $danruName,
+                'tanggalRekap' => $tanggalRekap,
+                'bulanText' => $bulanText,
+                'chunks' => $chunks,
+                'totalPages' => $totalPages,
+                'logoBase64' => config('pdf_logo.base64'),
             ])->setPaper('a4', 'landscape');
             return $pdf->stream("laporan_mingguan_{$minggu_ke}_{$bulan}_{$tahun}.pdf");
         }
@@ -864,12 +902,45 @@ class LaporanController extends Controller
         if ($type === 'excel') {
             return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\LaporanBulananWorkflowExport($tahun), "laporan_bulanan_{$bulan}_{$tahun}.xlsx");
         } else if ($type === 'pdf') {
+            $bulanList = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+            $dateObj = \Carbon\Carbon::now();
+            $tanggalRekap = $dateObj->format('d') . ' ' . strtoupper($bulanList[$dateObj->format('n') - 1]) . ' ' . $dateObj->format('Y');
+            $bulanText = is_numeric($bulan) ? $bulanList[(int)$bulan-1] : $bulan;
+
+            $totalWeeks = isset($detailedMonthlyData['totalWeeks']) ? $detailedMonthlyData['totalWeeks'] : 4;
+            $personnelList = collect($detailedMonthlyData['perPerson'] ?? []);
+            
+            $rowsPerPage = $jenis === 'danru' ? 3 : 20;
+            $chunks = $personnelList->chunk($rowsPerPage);
+            if ($chunks->isEmpty()) {
+                $chunks = collect([collect([])]);
+            }
+            $totalPages = $chunks->count();
+
+            $grandTotalScore = 0;
+            $validPersonCount = 0;
+            foreach($personnelList as $person) {
+                if ($person['avg_percentage'] !== null) {
+                    $grandTotalScore += $person['avg_percentage'];
+                    $validPersonCount++;
+                }
+            }
+
             $viewName = $jenis === 'danru' ? 'exports.laporan_bulanan_danru' : 'exports.laporan_bulanan';
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($viewName, [
                 'detailedMonthlyData' => $detailedMonthlyData,
                 'laporanBulananObj' => $laporanBulanan,
                 'bulan' => $bulan,
                 'tahun' => $tahun,
+                'tanggalRekap' => $tanggalRekap,
+                'bulanText' => $bulanText,
+                'totalWeeks' => $totalWeeks,
+                'chunks' => $chunks,
+                'totalPages' => $totalPages,
+                'grandTotalScore' => $grandTotalScore,
+                'validPersonCount' => $validPersonCount,
+                'rowsPerPage' => $rowsPerPage,
+                'logoBase64' => config('pdf_logo.base64'),
             ])->setPaper('a4', 'landscape');
             return $pdf->stream("laporan_bulanan_{$jenis}_{$bulan}_{$tahun}.pdf");
         }

@@ -29,7 +29,23 @@
 </head>
 <body>
 
-
+    @php
+        $logoBase64 = '';
+        if (file_exists(public_path('images/logo-app.png'))) {
+            $logoBase64 = config('pdf_logo.base64');
+        }
+        
+        $reguName = collect($anggotas)->pluck('regu')->unique()->filter()->implode(', ') ?: 'Semua Regu';
+        $bulanMap = [
+            'Januari' => 1, 'Februari' => 2, 'Maret' => 3, 'April' => 4,
+            'Mei' => 5, 'Juni' => 6, 'Juli' => 7, 'Agustus' => 8,
+            'September' => 9, 'Oktober' => 10, 'November' => 11, 'Desember' => 12
+        ];
+        $bulanAngka = is_numeric($bulan) ? (int)$bulan : ($bulanMap[$bulan] ?? date('n'));
+        $daysInMonth = \Carbon\Carbon::createFromDate($tahun, $bulanAngka, 1)->daysInMonth;
+        
+        $tanggalRekap = \Carbon\Carbon::now()->format('d M Y');
+    @endphp
 
     <!-- HEADER LAYOUT MASTER (3 KOLOM) -->
     <table style="width: 100%; border: none; margin-bottom: 15px;">

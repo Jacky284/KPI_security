@@ -34,12 +34,11 @@ interface Props {
   userRole: string;
   selectedBulan: string;
   selectedTahun: number;
-  selectedMinggu: number;
   filterRegu?: string | null;
   reguList?: string[];
 }
 
-export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan, selectedTahun, selectedMinggu, filterRegu, reguList }: Props) {
+export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan, selectedTahun, filterRegu, reguList }: Props) {
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"anggota" | "danru">("anggota");
 
@@ -88,18 +87,8 @@ export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan
     "Juli", "Agustus", "September", "Oktober", "November", "Desember"
   ];
 
-  const getAvailableWeeks = (bulanStr: string, tahun: number) => {
-    return [1, 2, 3, 4];
-  };
-
-  const availableWeeks = getAvailableWeeks(selectedBulan, selectedTahun);
-
-  const handleFilterChange = (bulan: string, minggu: number, tahun: number, regu?: string | null) => {
-    const available = getAvailableWeeks(bulan, tahun);
-    if (!available.includes(minggu)) {
-      minggu = available[available.length - 1]; // Clamp to the last available week if out of bounds
-    }
-    const params: any = { bulan, minggu_ke: minggu, tahun };
+  const handleFilterChange = (bulan: string, tahun: number, regu?: string | null) => {
+    const params: any = { bulan, tahun };
     if (regu) params.filter_regu = regu;
     router.get("/pelanggaran/daftar", params);
   };
@@ -139,20 +128,10 @@ export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan
               <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Bulan</label>
               <select
                 value={selectedBulan}
-                onChange={(e) => handleFilterChange(e.target.value, selectedMinggu, selectedTahun, filterRegu)}
+                onChange={(e) => handleFilterChange(e.target.value, selectedTahun, filterRegu)}
                 className="p-2 text-sm border rounded-md bg-background focus:ring-2 focus:ring-primary/50 w-full"
               >
                 {listBulan.map(b => <option key={b} value={b}>{b}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Minggu Ke</label>
-              <select
-                value={selectedMinggu}
-                onChange={(e) => handleFilterChange(selectedBulan, parseInt(e.target.value), selectedTahun, filterRegu)}
-                className="p-2 border rounded-md text-sm bg-background w-full"
-              >
-                {availableWeeks.map(w => <option key={w} value={w}>Minggu {w}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1">
@@ -160,7 +139,7 @@ export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan
               <input
                 type="number"
                 value={selectedTahun}
-                onChange={(e) => handleFilterChange(selectedBulan, selectedMinggu, parseInt(e.target.value), filterRegu)}
+                onChange={(e) => handleFilterChange(selectedBulan, parseInt(e.target.value), filterRegu)}
                 className="p-2 w-full md:w-24 text-sm border rounded-md bg-background focus:ring-2 focus:ring-primary/50"
               />
             </div>
@@ -170,7 +149,7 @@ export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Filter Regu</label>
                 <select
                   value={filterRegu || ""}
-                  onChange={(e) => handleFilterChange(selectedBulan, selectedMinggu, selectedTahun, e.target.value)}
+                  onChange={(e) => handleFilterChange(selectedBulan, selectedTahun, e.target.value)}
                   className="p-2 text-sm border rounded-md bg-background focus:ring-2 focus:ring-primary/50 w-full"
                 >
                   <option value="">Semua Regu</option>
@@ -181,9 +160,8 @@ export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-2 md:border-l md:pl-4 md:ml-auto w-full md:w-auto">
-
             <Button asChild variant="outline" size="sm" className="w-full sm:w-auto bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 border-red-200">
-              <a href={`/export/pelanggaran?type=pdf&minggu_ke=${selectedMinggu}&bulan=${selectedBulan}&tahun=${selectedTahun}${filterRegu ? `&filter_regu=${filterRegu}` : ''}&jenis=${activeTab}`} target="_blank">
+              <a href={`/export/pelanggaran?type=pdf&bulan=${selectedBulan}&tahun=${selectedTahun}${filterRegu ? `&filter_regu=${filterRegu}` : ''}&jenis=${activeTab}`} target="_blank">
                 Export PDF
               </a>
             </Button>
@@ -191,7 +169,7 @@ export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan
         </div>
 
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-0">
             {/* Desktop View */}
             <div className="hidden lg:block overflow-x-auto">
               {(() => {

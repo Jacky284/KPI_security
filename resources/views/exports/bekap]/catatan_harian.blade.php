@@ -37,7 +37,18 @@
     </style>
 </head>
 <body>
+    @php
+        $logoBase64 = '';
+        if (file_exists(public_path('images/logo-app.png'))) {
+            $logoBase64 = config('pdf_logo.base64');
+        }
 
+        $chunks = collect($catatan)->chunk(10);
+        if ($chunks->isEmpty()) {
+            $chunks = collect([collect([])]);
+        }
+        $totalPages = $chunks->count();
+    @endphp
 
     @foreach($chunks as $pageIndex => $chunk)
     <div style="{{ $pageIndex < $totalPages - 1 ? 'page-break-after: always;' : '' }}">

@@ -408,7 +408,7 @@ export default function CatatanHarianIndex({
         </div>
 
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-0">
             <div className="hidden lg:block overflow-x-auto">
               <table className="w-full text-left text-sm border-collapse">
                 <thead>

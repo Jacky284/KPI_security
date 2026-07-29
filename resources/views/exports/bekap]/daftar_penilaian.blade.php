@@ -41,7 +41,24 @@
     </style>
 </head>
 <body>
+    @php
+        $logoBase64 = '';
+        if (file_exists(public_path('images/logo-app.png'))) {
+            $logoBase64 = config('pdf_logo.base64');
+        }
 
+        // Pengecekan Tanggal Rekap jika tidak dipassing dari controller
+        $tglRekap = isset($tanggalRekap) ? $tanggalRekap : \Carbon\Carbon::now()->translatedFormat('d F Y');
+
+        $reguName = isset($filter_regu) && $filter_regu ? $filter_regu : (count($pelanggaran) > 0 ? collect($pelanggaran)->pluck('anggota.regu')->unique()->filter()->implode(', ') : 'SEMUA REGU');
+
+        // DIBATASI 10 BARIS MUTLAK
+        $chunks = collect($pelanggaran)->chunk(10);
+        if ($chunks->isEmpty()) {
+            $chunks = collect([collect([])]);
+        }
+        $totalPages = $chunks->count();
+    @endphp
 
     @foreach($chunks as $pageIndex => $chunk)
     <div style="{{ $pageIndex < $totalPages - 1 ? 'page-break-after: always;' : '' }}">

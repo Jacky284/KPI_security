@@ -49,7 +49,38 @@
     </style>
 </head>
 <body>
+    @php
+        $bulanList = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+        $dateObj = \Carbon\Carbon::now();
+        $tanggalRekap = $dateObj->format('d') . ' ' . strtoupper($bulanList[$dateObj->format('n') - 1]) . ' ' . $dateObj->format('Y');
+        $bulanText = isset($bulan) ? (is_numeric($bulan) ? $bulanList[$bulan-1] : $bulan) : $bulanList[date('n')-1];
 
+        $totalWeeks = isset($detailedMonthlyData['totalWeeks']) ? $detailedMonthlyData['totalWeeks'] : 4;
+
+        $logoBase64 = '';
+        if (file_exists(public_path('images/logo-app.png'))) {
+            $logoBase64 = config('pdf_logo.base64');
+        }
+
+        $personnelList = collect($detailedMonthlyData['perPerson'] ?? []);
+
+        $rowsPerPage = 20;
+
+        $chunks = $personnelList->chunk($rowsPerPage);
+        if ($chunks->isEmpty()) {
+            $chunks = collect([collect([])]);
+        }
+        $totalPages = $chunks->count();
+
+        $grandTotalScore = 0;
+        $validPersonCount = 0;
+        foreach($personnelList as $person) {
+            if ($person['avg_percentage'] !== null) {
+                $grandTotalScore += $person['avg_percentage'];
+                $validPersonCount++;
+            }
+        }
+    @endphp
 
     @foreach($chunks as $pageIndex => $chunk)
         <div style="{{ $pageIndex < $totalPages - 1 ? 'page-break-after: always;' : '' }}">
