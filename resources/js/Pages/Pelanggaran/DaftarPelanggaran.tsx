@@ -4,6 +4,8 @@ import DashboardLayout from "@/Layouts/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PdfExportButton } from "@/components/PdfExportButton";
+import { ConfirmModal } from "@/components/ConfirmModal";
 
 interface Pelanggaran {
   id_catatan: number;
@@ -41,6 +43,7 @@ interface Props {
 export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan, selectedTahun, filterRegu, reguList }: Props) {
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"anggota" | "danru">("anggota");
+  const [tindakLanjutId, setTindakLanjutId] = useState<number | null>(null);
 
   const formatDayName = (dateStr: string | null) => {
     if (!dateStr) return "-";
@@ -57,11 +60,18 @@ export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan
   };
 
   const handleTindakLanjut = (id: number) => {
-    if (confirm("Tandai pelanggaran ini sudah ditindaklanjuti?")) {
-      setProcessingId(id);
-      router.patch(`/pelanggaran/${id}/tindak-lanjut`, { status_tindak_lanjut: "Sudah" }, {
-        onSuccess: () => alert("Status berhasil diperbarui!"),
-        onFinish: () => setProcessingId(null),
+    setTindakLanjutId(id);
+  };
+
+  const confirmTindakLanjut = () => {
+    if (tindakLanjutId) {
+      setProcessingId(tindakLanjutId);
+      router.patch(`/pelanggaran/${tindakLanjutId}/tindak-lanjut`, { status_tindak_lanjut: "Sudah" }, {
+        preserveScroll: true,
+        onFinish: () => {
+          setProcessingId(null);
+          setTindakLanjutId(null);
+        },
       });
     }
   };
@@ -96,6 +106,16 @@ export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan
   return (
     <>
       <Head title="Daftar Pelanggaran" />
+
+      <ConfirmModal
+        isOpen={tindakLanjutId !== null}
+        onOpenChange={(open) => !open && setTindakLanjutId(null)}
+        title="Konfirmasi Tindak Lanjut"
+        description="Apakah Anda yakin ingin menandai pelanggaran ini sudah ditindaklanjuti? Tindakan ini akan mengubah statusnya."
+        onConfirm={confirmTindakLanjut}
+        confirmText="Ya, Sudah"
+      />
+
       <div className="flex flex-col gap-6 max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -160,11 +180,9 @@ export default function DaftarPelanggaran({ pelanggaran, userRole, selectedBulan
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-2 md:border-l md:pl-4 md:ml-auto w-full md:w-auto">
-            <Button asChild variant="outline" size="sm" className="w-full sm:w-auto bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 border-red-200">
-              <a href={`/export/pelanggaran?type=pdf&bulan=${selectedBulan}&tahun=${selectedTahun}${filterRegu ? `&filter_regu=${filterRegu}` : ''}&jenis=${activeTab}`} target="_blank">
-                Export PDF
-              </a>
-            </Button>
+            <PdfExportButton 
+              url={`/export/pelanggaran?type=pdf&bulan=${selectedBulan}&tahun=${selectedTahun}${filterRegu ? `&filter_regu=${filterRegu}` : ''}&jenis=${activeTab}`}
+            />
           </div>
         </div>
 

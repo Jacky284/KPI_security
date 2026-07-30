@@ -4,6 +4,8 @@ import DashboardLayout from "@/Layouts/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Edit, Ban, CheckCircle } from "lucide-react";
+import { toast } from "sonner";
+import { ConfirmModal } from "@/components/ConfirmModal";
 
 interface User {
   id_user: number;
@@ -58,13 +60,16 @@ export default function UserManagement({ users, regus = [] }: Props) {
   const { data: reguData, setData: setReguData, post: postRegu, processing: reguProcessing, reset: resetRegu } = useForm({
     nama_regu: "",
   });
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deleteName, setDeleteName] = useState<string>("");
+  const [toggleId, setToggleId] = useState<number | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     post("/admin/users", {
+      preserveScroll: true,
       onSuccess: () => {
         reset();
-        alert("User berhasil didaftarkan!");
       },
     });
   };
@@ -73,26 +78,45 @@ export default function UserManagement({ users, regus = [] }: Props) {
     e.preventDefault();
     if (editingUserId) {
       update(`/admin/users/${editingUserId}`, {
+        preserveScroll: true,
         onSuccess: () => {
           setEditingUserId(null);
-          alert("Data user berhasil diperbarui!");
         },
       });
     }
   };
 
   const handleToggleStatus = (id: number) => {
-    if (confirm("Apakah Anda yakin ingin mengubah status aktif user ini?")) {
-      router.post(`/admin/users/${id}/toggle-status`);
+    setToggleId(id);
+  };
+
+  const confirmToggleStatus = () => {
+    if (toggleId !== null) {
+      router.post(`/admin/users/${toggleId}/toggle-status`, {}, {
+        preserveScroll: true,
+        onFinish: () => setToggleId(null)
+      });
+    }
+  };
+
+  const confirmDelete = () => {
+    if (deleteId !== null) {
+      router.delete(`/admin/users/${deleteId}`, {
+        onSuccess: () => cancelEdit(),
+        onFinish: () => {
+          setDeleteId(null);
+          setDeleteName("");
+        }
+      });
     }
   };
 
   const handleAddRegu = (e: React.FormEvent) => {
     e.preventDefault();
     postRegu("/admin/regus", {
+      preserveScroll: true,
       onSuccess: () => {
         resetRegu();
-        alert("Regu berhasil ditambahkan!");
       }
     });
   };
@@ -266,11 +290,8 @@ export default function UserManagement({ users, regus = [] }: Props) {
                     type="button" 
                     variant="destructive" 
                     onClick={() => {
-                      if (confirm(`Apakah Anda yakin ingin menghapus user ${editData.nama_lengkap}? Aksi ini tidak dapat dibatalkan!`)) {
-                        router.delete(`/admin/users/${editingUserId}`, {
-                          onSuccess: () => cancelEdit()
-                        });
-                      }
+                      setDeleteId(editingUserId);
+                      setDeleteName(editData.nama_lengkap);
                     }}
                   >
                     Hapus
@@ -285,6 +306,31 @@ export default function UserManagement({ users, regus = [] }: Props) {
           </Card>
         </div>
       )}
+
+      <Head title="Manajemen User & Regu" />
+
+      <ConfirmModal
+        isOpen={toggleId !== null}
+        onOpenChange={(open) => !open && setToggleId(null)}
+        title="Ubah Status User"
+        description="Apakah Anda yakin ingin mengubah status aktif user ini?"
+        onConfirm={confirmToggleStatus}
+        confirmText="Ya, Ubah"
+      />
+
+      <ConfirmModal
+        isOpen={deleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteId(null);
+            setDeleteName("");
+          }
+        }}
+        title="Hapus User"
+        description={`Apakah Anda yakin ingin menghapus user ${deleteName}? Aksi ini tidak dapat dibatalkan!`}
+        onConfirm={confirmDelete}
+        confirmText="Ya, Hapus"
+      />
 
       <div className="flex flex-col gap-6 max-w-7xl mx-auto">
         <div>

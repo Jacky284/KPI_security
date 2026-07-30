@@ -10,6 +10,7 @@ import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 import { useShallow } from "zustand/react/shallow";
 import { LayoutControls } from "@/components/dashboard/sidebar/layout-controls";
 import { ThemeSwitcher } from "@/components/dashboard/sidebar/theme-switcher";
+import { FlashToast } from "@/components/FlashToast";
 
 export default function DashboardLayout({ children }: Readonly<{ children: ReactNode }>) {
   const defaultOpen = getClientCookie("sidebar_state") !== "false";
@@ -60,6 +61,7 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
           {children}
         </div>
       </SidebarInset>
+      <FlashToast />
     </SidebarProvider>
   );
 }

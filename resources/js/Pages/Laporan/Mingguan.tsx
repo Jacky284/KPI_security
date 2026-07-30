@@ -3,7 +3,9 @@ import { router, Head } from "@inertiajs/react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { SignaturePad } from "@/components/SignaturePad";
+import { PdfExportButton } from "@/components/PdfExportButton";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface DanruPembuat {
@@ -137,7 +139,7 @@ export default function LaporanMingguan({
   };
   const handleSaveMingguanSignature = (reportId: number, signature: string, isUsingSaved: boolean = false) => {
     if (!signature) {
-      alert("Harap tanda tangan terlebih dahulu.");
+      toast.warning("Harap tanda tangan terlebih dahulu.");
       return;
     }
 
@@ -146,13 +148,13 @@ export default function LaporanMingguan({
       role: currentUser.role,
       use_saved: isUsingSaved
     }, {
+      preserveScroll: true,
       onSuccess: () => {
         setActiveMingguanSignatures(prev => {
           const next = { ...prev };
           delete next[reportId];
           return next;
         });
-        alert("Tanda tangan Laporan Mingguan berhasil disimpan!");
       }
     });
   };
@@ -279,11 +281,10 @@ export default function LaporanMingguan({
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-2 md:border-l md:pl-4 md:ml-auto w-full md:w-auto">
-            <Button asChild variant="outline" size="sm" className={`w-full sm:w-auto bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 border-red-200 ${!canExportMingguan ? 'pointer-events-none opacity-50' : ''}`}>
-              <a href={canExportMingguan ? `/export/laporan?type=pdf&minggu_ke=${selectedMinggu}&bulan=${selectedBulan}&tahun=${selectedTahun}${filterRegu ? `&filter_regu=${filterRegu}` : ''}` : '#'} target={canExportMingguan ? "_blank" : undefined}>
-                Export PDF
-              </a>
-            </Button>
+            <PdfExportButton 
+              url={`/export/laporan?type=pdf&minggu_ke=${selectedMinggu}&bulan=${selectedBulan}&tahun=${selectedTahun}${filterRegu ? `&filter_regu=${filterRegu}` : ''}`}
+              disabled={!canExportMingguan}
+            />
           </div>
         </div>
 

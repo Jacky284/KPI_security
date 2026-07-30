@@ -49,7 +49,9 @@ class CatatanHarianController extends Controller
             }
         }
 
-        $catatan = $query->orderBy('tanggal', 'desc')->get();
+        $catatan = $query->orderBy('tanggal', 'desc')
+                         ->orderBy('created_at', 'desc')
+                         ->get();
 
         // Options for Anggota selection in modal
         $anggotaQuery = User::where('status_aktif', 1);
@@ -101,7 +103,7 @@ class CatatanHarianController extends Controller
             'id_anggota' => 'required|exists:users,id_user',
             'tanggal' => 'required|date',
             'jam_kejadian' => 'nullable|string',
-            'shift' => 'required|in:Pagi,Malam',
+            'shift' => 'required|in:Pagi,Malam,Non-Shift',
             'pos_lokasi' => 'nullable|string',
             'indikator' => 'required|string',
             'deskripsi' => 'required|string',
@@ -212,10 +214,10 @@ class CatatanHarianController extends Controller
         $totalPages = $chunks->count();
         
         $html = view('exports.catatan_harian', [
+            'logoBase64' => config('pdf_logo.base64'),
             'catatan' => $catatan,
             'chunks' => $chunks,
             'totalPages' => $totalPages,
-            'logoBase64' => config('pdf_logo.base64'),
             'bulan' => $bulan,
             'tahun' => $tahun,
             'minggu_ke' => $minggu_ke,
@@ -233,6 +235,10 @@ class CatatanHarianController extends Controller
             ->landscape()
             ->showBackground()
             ->margins(0, 0, 0, 0)
+            ->noSandbox()
+            ->waitUntil('domcontentloaded')
+            ->timeout(30000)
+            ->setOption('args', ['--disable-web-security', '--allow-file-access-from-files'])
             ->pdf();
             
         return response($pdfContent)

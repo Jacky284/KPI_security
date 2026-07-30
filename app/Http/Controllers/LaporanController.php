@@ -106,24 +106,8 @@ class LaporanController extends Controller
             $jadwalHarian = isset($jadwals[$officer->id_user]) ? $jadwals[$officer->id_user]->jadwal_harian : [];
 
             for ($m = 1; $m <= $totalWeeks; $m++) {
-                $passedWorkingDays = 0;
-                $hasSchedule = false;
-                
-                for ($d = 1; $d <= $daysInMonth; $d++) {
-                    if ($dayToWeekMap[$d] !== $m) continue;
-
-                    $shiftDay = isset($jadwalHarian[$d]) ? $jadwalHarian[$d] : null;
-                    if ($shiftDay) {
-                        $hasSchedule = true;
-                        if ($shiftDay !== 'Libur') {
-                            $dateOfD = clone $firstOfMonth;
-                            $dateOfD->day($d)->startOfDay();
-                            if (\Carbon\Carbon::now()->gte($dateOfD)) {
-                                $passedWorkingDays++;
-                            }
-                        }
-                    }
-                }
+                $passedWorkingDays = 7;
+                $hasSchedule = true;
 
                 $totalWeekScore = 0;
                 foreach ($indicators as $ind) {
@@ -283,37 +267,17 @@ class LaporanController extends Controller
         $indicators = ['Disiplin Kerja', 'Kehadiran', 'Penampilan & Kerapihan', 'Komunikasi & Pelayanan'];
         $now = \Carbon\Carbon::now();
 
+        $allViolations = \App\Models\CatatanPelanggaran::whereIn('id_anggota', $anggotaList->pluck('id_user'))
+            ->where('minggu_ke', $minggu_ke)
+            ->where('bulan', $bulan)
+            ->where('tahun', $tahun)
+            ->get();
+
         foreach ($anggotaList as $officer) {
-            $passedWorkingDays = 0;
-            $hasSchedule = false;
+            $passedWorkingDays = 7;
+            $hasSchedule = true;
 
-            for ($date = $currentWeekStart->copy(); $date->lte($currentWeekEnd); $date->addDay()) {
-                $d = $date->day;
-                $shiftDay = null;
-
-                if ($date->month == (int)$bulanNum) {
-                    $shiftDay = isset($jadwals[$officer->id_user]) ? ($jadwals[$officer->id_user]->jadwal_harian[$d] ?? null) : null;
-                } elseif ($jadwalsPrevMonth && $date->month == $currentWeekStart->month) {
-                    $shiftDay = isset($jadwalsPrevMonth[$officer->id_user]) ? ($jadwalsPrevMonth[$officer->id_user]->jadwal_harian[$d] ?? null) : null;
-                } elseif ($jadwalsNextMonth && $date->month == $currentWeekEnd->month) {
-                    $shiftDay = isset($jadwalsNextMonth[$officer->id_user]) ? ($jadwalsNextMonth[$officer->id_user]->jadwal_harian[$d] ?? null) : null;
-                }
-
-                if ($shiftDay) {
-                    $hasSchedule = true;
-                    if ($shiftDay !== 'Libur') {
-                        if ($now->gte($date->copy()->startOfDay())) {
-                            $passedWorkingDays++;
-                        }
-                    }
-                }
-            }
-
-            $violations = CatatanPelanggaran::where('id_anggota', $officer->id_user)
-                ->where('minggu_ke', $minggu_ke)
-                ->where('bulan', $bulan)
-                ->where('tahun', $tahun)
-                ->get();
+            $violations = $allViolations->where('id_anggota', $officer->id_user);
 
             $scores = [];
             $totalScore = 0;
@@ -396,12 +360,12 @@ class LaporanController extends Controller
 
     private function autoGenerateLaporan($bulan, $tahun)
     {
-        $bulanNum = str_pad($this->parseBulanToNumber($bulan), 2, '0', STR_PAD_LEFT);
-        $jadwals = \App\Models\JadwalBulanan::where('bulan', $bulanNum)->where('tahun', $tahun)->get();
-        if ($jadwals->isEmpty()) return;
-
-        $anggotaIds = $jadwals->pluck('id_anggota')->unique();
-        $regus = User::whereIn('id_user', $anggotaIds)->pluck('regu')->unique()->filter();
+        $regus = User::whereIn('role', ['Anggota', 'Danru'])
+            ->where('status_aktif', 1)
+            ->whereNotNull('regu')
+            ->pluck('regu')
+            ->unique()
+            ->filter();
 
         $totalWeeks = 4; // Fix to 4 weeks per month for Laporan Mingguan
 
@@ -796,6 +760,10 @@ class LaporanController extends Controller
                 ->landscape()
                 ->showBackground()
                 ->margins(0, 0, 0, 0)
+                ->noSandbox()
+                ->waitUntil('domcontentloaded')
+                ->timeout(30000)
+                ->setOption('args', ['--disable-web-security', '--allow-file-access-from-files'])
                 ->pdf();
                 
             return response($pdfContent)
@@ -811,6 +779,12 @@ class LaporanController extends Controller
         $bulanNum = str_pad($this->parseBulanToNumber($bulan), 2, '0', STR_PAD_LEFT);
 
         $danrus = User::where('role', 'Danru')->where('status_aktif', 1)->get();
+        
+        $allPelanggarans = \App\Models\CatatanPelanggaran::whereIn('id_anggota', $danrus->pluck('id_user'))
+            ->where('bulan', $bulan)
+            ->where('tahun', $tahun)
+            ->get();
+
         $perPerson = [];
         $totalPengawasan = 0; $countPengawasan = 0;
         $totalPelaporan = 0; $countPelaporan = 0;
@@ -823,10 +797,7 @@ class LaporanController extends Controller
                 'Penyelesaian Masalah' => 5,
             ];
 
-            $pelanggarans = \App\Models\CatatanPelanggaran::where('id_anggota', $danru->id_user)
-                ->where('bulan', $bulan)
-                ->where('tahun', $tahun)
-                ->get();
+            $pelanggarans = $allPelanggarans->where('id_anggota', $danru->id_user);
 
             foreach ($pelanggarans as $p) {
                 if (isset($scores[$p->kategori_indikator])) {
@@ -874,6 +845,7 @@ class LaporanController extends Controller
             $perIndicator[] = [
                 'indikator' => $ind['name'],
                 'target' => 100,
+                'target_text' => '100%',
                 'achieved_percentage' => $achievedPercentage,
                 'keterangan' => $keterangan,
             ];
@@ -940,6 +912,7 @@ class LaporanController extends Controller
 
             $viewName = $jenis === 'danru' ? 'exports.laporan_bulanan_danru' : 'exports.laporan_bulanan';
             $html = view($viewName, [
+                'logoBase64' => config('pdf_logo.base64'),
                 'detailedMonthlyData' => $detailedMonthlyData,
                 'laporanBulananObj' => $laporanBulanan,
                 'bulan' => $bulan,
@@ -952,7 +925,6 @@ class LaporanController extends Controller
                 'grandTotalScore' => $grandTotalScore,
                 'validPersonCount' => $validPersonCount,
                 'rowsPerPage' => $rowsPerPage,
-                'logoBase64' => config('pdf_logo.base64'),
             ])->render();
             
             $fileName = "laporan_bulanan_{$jenis}_{$bulan}_{$tahun}.pdf";
@@ -962,6 +934,10 @@ class LaporanController extends Controller
                 ->landscape()
                 ->showBackground()
                 ->margins(0, 0, 0, 0)
+                ->noSandbox()
+                ->waitUntil('domcontentloaded')
+                ->timeout(30000)
+                ->setOption('args', ['--disable-web-security', '--allow-file-access-from-files'])
                 ->pdf();
                 
             return response($pdfContent)

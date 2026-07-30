@@ -322,7 +322,7 @@ export default function Manage({ anggotas, jadwals, bulan, tahun }: Props) {
     e.preventDefault();
     post('/jadwal/manage', {
       preserveScroll: true,
-      onSuccess: () => alert('Jadwal berhasil disimpan!')
+      onSuccess: () => {}
     });
   };
 

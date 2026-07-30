@@ -35,9 +35,7 @@
     <table style="width: 100%; border: none; margin-bottom: 15px;">
         <tr>
             <td style="width: 15%; text-align: left; vertical-align: middle; border: none;">
-                @if($logoBase64)
-                    <img src="{{ $logoBase64 }}" style="height: 75px; width: auto;">
-                @endif
+                    <img src="{{ public_path('images/logo-app.png') }}" style="height: 75px; width: auto;">
             </td>
             <td style="width: 62%; text-align: center; vertical-align: middle; border: none;">
                 <h1 class="header-title">JADWAL BULANAN SEKURITI</h1>

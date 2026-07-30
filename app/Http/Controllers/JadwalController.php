@@ -105,6 +105,10 @@ class JadwalController extends Controller
                 ->landscape()
                 ->showBackground()
                 ->margins(0, 0, 0, 0)
+                ->noSandbox()
+                ->waitUntil('domcontentloaded')
+                ->timeout(30000)
+                ->setOption('args', ['--disable-web-security', '--allow-file-access-from-files'])
                 ->pdf();
                 
             return response($pdfContent)

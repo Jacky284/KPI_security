@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\CatatanPelanggaran;
-use App\Models\JadwalBulanan;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Carbon\Carbon;
@@ -42,13 +41,7 @@ class AnggotaController extends Controller
         $currentMonth = str_pad($now->month, 2, '0', STR_PAD_LEFT);
         $currentYear = $now->year;
 
-        // Fetch schedules for all members this month
-        $jadwals = JadwalBulanan::where('bulan', $currentMonth)
-            ->where('tahun', $currentYear)
-            ->get()
-            ->keyBy('id_anggota');
-
-        $anggotaData = $anggota->map(function($user) use ($now, $jadwals) {
+        $anggotaData = $anggota->map(function($user) use ($now) {
             // Calculate Usia
             $usia = '-';
             if ($user->tanggal_lahir) {
@@ -110,10 +103,6 @@ class AnggotaController extends Controller
 
         // 2. Get Jadwal Minggu Ini
         // We will fetch the whole month's schedule and the frontend can parse "Minggu Ini"
-        $jadwalBulanIni = JadwalBulanan::where('id_anggota', $id)
-            ->where('bulan', str_pad($currentMonth, 2, '0', STR_PAD_LEFT))
-            ->where('tahun', $currentYear)
-            ->first();
 
         // 3. Generate 3-Month Performance Data (Per Indicator)
         $trendData = [];
@@ -145,10 +134,7 @@ class AnggotaController extends Controller
                 ->where('tahun', $tYear)
                 ->get();
             
-            $jadwalThatMonth = JadwalBulanan::where('id_anggota', $id)
-                ->where('bulan', str_pad($tMonth, 2, '0', STR_PAD_LEFT))
-                ->where('tahun', $tYear)
-                ->first();
+
                 
             $monthData = [
                 'name' => substr($tBulanStr, 0, 3)
@@ -175,15 +161,7 @@ class AnggotaController extends Controller
                     }
                 }
                 
-                $hasSchedule = false;
-                if ($jadwalThatMonth && is_array($jadwalThatMonth->jadwal_harian)) {
-                    foreach ($jadwalThatMonth->jadwal_harian as $d => $sStr) {
-                        if ($sStr !== 'Libur') {
-                            $hasSchedule = true;
-                            break;
-                        }
-                    }
-                }
+                $hasSchedule = true;
                 
                 $monthData[$ind] = $hasSchedule ? max(0, 100 - $deduction) : 0;
             }
@@ -207,27 +185,14 @@ class AnggotaController extends Controller
             $indicatorHasMalam[$ind] = false;
         }
 
-        // Check overall scheduled shifts in selected 3 months
-        $startOf3Months = clone $startDate;
-        $endOf3Months = clone $startDate;
-        $endOf3Months->addMonths(2)->endOfMonth();
-
-        $jadwal3Months = JadwalBulanan::where('id_anggota', $id)
-            ->whereBetween('tahun', [$startOf3Months->year, $endOf3Months->year])
-            ->get()->keyBy(function($j) { return $j->tahun . '-' . str_pad($j->bulan, 2, '0', STR_PAD_LEFT); });
-
-        foreach ($jadwal3Months as $j) {
-            if (is_array($j->jadwal_harian)) {
-                foreach ($j->jadwal_harian as $d => $sStr) {
-                    $lower = strtolower((string)$sStr);
-                    if (strpos($lower, 'pagi') !== false || strpos($lower, 'siang') !== false) {
-                        foreach ($defaultIndicators as $ind) $indicatorHasPagi[$ind] = true;
-                    } elseif (strpos($lower, 'malam') !== false) {
-                        foreach ($defaultIndicators as $ind) $indicatorHasMalam[$ind] = true;
-                    }
-                }
-            }
+        // We assume indicators are present for both shifts since schedule is not automatic anymore.
+        foreach ($defaultIndicators as $ind) {
+            $indicatorHasPagi[$ind] = true;
+            $indicatorHasMalam[$ind] = true;
         }
+
+        $startOf3Months = $startDate->copy()->startOfMonth();
+        $endOf3Months = $startDate->copy()->addMonths(2)->endOfMonth();
 
         $violations3Months = CatatanPelanggaran::where('id_anggota', $id)
             ->whereBetween('tanggal_penilaian', [$startOf3Months->format('Y-m-d'), $endOf3Months->format('Y-m-d')])
@@ -246,25 +211,19 @@ class AnggotaController extends Controller
                 $indicatorHasMalam[$kategori] = true;
             }
 
-            $vDate = Carbon::parse($v->tanggal_penilaian);
-            $jKey = $vDate->year . '-' . str_pad($vDate->month, 2, '0', STR_PAD_LEFT);
-            $jadwalThatMonth = $jadwal3Months->get($jKey);
-
-            $shift = 'Libur';
-            if ($jadwalThatMonth && is_array($jadwalThatMonth->jadwal_harian)) {
-                $day = $vDate->format('j');
-                $dailyShift = $jadwalThatMonth->jadwal_harian[$day] ?? 'Libur';
-                $lowerD = strtolower((string)$dailyShift);
-                if (strpos($lowerD, 'malam') !== false) {
-                    $shift = 'Malam';
-                } elseif (strpos($lowerD, 'pagi') !== false || strpos($lowerD, 'siang') !== false) {
-                    $shift = 'Pagi';
-                }
+            $shift = $v->shift ?? 'Libur';
+            $lowerD = strtolower((string)$shift);
+            if (strpos($lowerD, 'malam') !== false) {
+                $shift = 'Malam';
+            } elseif (strpos($lowerD, 'pagi') !== false || strpos($lowerD, 'siang') !== false) {
+                $shift = 'Pagi';
+            } else {
+                $shift = 'Pagi'; // Default to pagi if non-shift
             }
 
             if ($shift === 'Malam') {
                 $indicatorDeductionMalam[$kategori] += $deduction;
-            } elseif ($shift === 'Pagi') {
+            } else {
                 $indicatorDeductionPagi[$kategori] += $deduction;
             }
         }
@@ -281,6 +240,8 @@ class AnggotaController extends Controller
                 'Malam' => $hMalam ? max(0, 100 - $mDeduction) : 0,
             ];
         }
+
+        $jadwalBulanIni = [];
 
         return Inertia::render('Anggota/Detail', [
             'anggota' => $anggota,

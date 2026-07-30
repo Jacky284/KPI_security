@@ -12,6 +12,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Plus, FileText } from "lucide-react";
+import { PdfExportButton } from "@/components/PdfExportButton";
+import { ConfirmModal } from "@/components/ConfirmModal";
 
 interface Anggota {
   id_user: number;
@@ -64,6 +66,7 @@ export default function CatatanHarianIndex({
 }: Props) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [processingId, setProcessingId] = useState<number | null>(null);
+  const [tindakLanjutId, setTindakLanjutId] = useState<number | null>(null);
 
   const listBulan = [
     "Januari", "Februari", "Maret", "April", "Mei", "Juni",
@@ -121,11 +124,18 @@ export default function CatatanHarianIndex({
   };
 
   const handleTindakLanjut = (id: number) => {
-    if (confirm("Tandai catatan harian ini sudah ditindaklanjuti?")) {
-      setProcessingId(id);
-      router.patch(`/catatan-harian/${id}/tindak-lanjut`, { status_tindak_lanjut: "Sudah" }, {
-        onSuccess: () => alert("Status berhasil diperbarui!"),
-        onFinish: () => setProcessingId(null),
+    setTindakLanjutId(id);
+  };
+
+  const confirmTindakLanjut = () => {
+    if (tindakLanjutId) {
+      setProcessingId(tindakLanjutId);
+      router.patch(`/catatan-harian/${tindakLanjutId}/tindak-lanjut`, { status_tindak_lanjut: "Sudah" }, {
+        preserveScroll: true,
+        onFinish: () => {
+          setProcessingId(null);
+          setTindakLanjutId(null);
+        },
       });
     }
   };
@@ -147,6 +157,16 @@ export default function CatatanHarianIndex({
   return (
     <>
       <Head title="Catatan Harian" />
+      
+      <ConfirmModal
+        isOpen={tindakLanjutId !== null}
+        onOpenChange={(open) => !open && setTindakLanjutId(null)}
+        title="Konfirmasi Tindak Lanjut"
+        description="Apakah Anda yakin ingin menandai catatan harian ini sudah ditindaklanjuti? Tindakan ini akan mengubah statusnya."
+        onConfirm={confirmTindakLanjut}
+        confirmText="Ya, Sudah"
+      />
+
       <div className="flex flex-col gap-6 max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -225,7 +245,7 @@ export default function CatatanHarianIndex({
 
                   <div className="flex flex-col gap-1.5">
                     <label className="text-sm font-semibold">Shift</label>
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-wrap items-center gap-4 mt-1">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="radio"
@@ -247,6 +267,17 @@ export default function CatatanHarianIndex({
                           className="w-4 h-4 text-primary"
                         />
                         Malam
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="shift"
+                          value="Non-Shift"
+                          checked={data.shift === "Non-Shift"}
+                          onChange={(e) => setData("shift", e.target.value)}
+                          className="w-4 h-4 text-primary"
+                        />
+                        Non-Shift
                       </label>
                     </div>
                   </div>
@@ -399,11 +430,9 @@ export default function CatatanHarianIndex({
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-2 md:border-l md:pl-4 md:ml-auto w-full md:w-auto">
-            <Button asChild variant="outline" size="sm" className="w-full sm:w-auto bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 border-red-200">
-              <a href={`/catatan-harian/export-pdf?bulan=${selectedBulan}&tahun=${selectedTahun}&minggu_ke=${selectedMinggu}${filterRegu ? `&filter_regu=${filterRegu}` : ''}`} target="_blank">
-                Export PDF
-              </a>
-            </Button>
+            <PdfExportButton 
+              url={`/catatan-harian/export-pdf?bulan=${selectedBulan}&tahun=${selectedTahun}&minggu_ke=${selectedMinggu}${filterRegu ? `&filter_regu=${filterRegu}` : ''}`}
+            />
           </div>
         </div>
 

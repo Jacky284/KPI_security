@@ -29,7 +29,7 @@ createInertiaApp({
             <TooltipProvider>
                 <PreferencesStoreProvider initialValues={PREFERENCE_DEFAULTS}>
                     <App {...props} />
-                    <Toaster />
+                    <Toaster position="bottom-right" richColors expand={true} />
                 </PreferencesStoreProvider>
             </TooltipProvider>
         );

@@ -85,6 +85,7 @@ export default function InputPelanggaran({ anggota, jadwals, userRole }: Props) 
   const { data, setData, post, processing, errors, reset, wasSuccessful } = useForm({
     id_anggota: initialAnggotaId,
     tanggal_penilaian: todayStr,
+    shift: "Pagi",
     minggu_ke: initialWeekDetails.minggu_ke,
     bulan: initialWeekDetails.bulan,
     tahun: initialWeekDetails.tahun,
@@ -159,9 +160,9 @@ export default function InputPelanggaran({ anggota, jadwals, userRole }: Props) 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     post("/pelanggaran", {
+      preserveScroll: true,
       onSuccess: () => {
         reset("deskripsi_penilaian", "id_anggota");
-        alert("Catatan pelanggaran berhasil disimpan!");
       },
     });
   };
@@ -173,26 +174,7 @@ export default function InputPelanggaran({ anggota, jadwals, userRole }: Props) 
 
   const reguName = selectedUser?.regu || "-";
 
-  // Calculate Shift based on selected user and date
-  let shiftName = "-";
-  if (data.id_anggota && data.tanggal_penilaian) {
-    const dateObj = new Date(data.tanggal_penilaian);
-    const day = dateObj.getDate().toString();
-    const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
-    const year = dateObj.getFullYear();
-
-    const userJadwal = jadwals.find(j =>
-      j.id_anggota.toString() === data.id_anggota.toString() &&
-      j.bulan === month &&
-      j.tahun === year
-    );
-
-    if (userJadwal && userJadwal.jadwal_harian) {
-      shiftName = userJadwal.jadwal_harian[day] || "Libur";
-    } else {
-      shiftName = "Tidak Ada Jadwal (Libur)";
-    }
-  }
+  // Shift is handled manually now
 
   return (
     <>
@@ -246,7 +228,7 @@ export default function InputPelanggaran({ anggota, jadwals, userRole }: Props) 
                 </div>
 
                 {/* Regu & Shift Jaga */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5">
                     <label className="text-sm font-semibold text-foreground">Regu</label>
                     <input
@@ -258,12 +240,42 @@ export default function InputPelanggaran({ anggota, jadwals, userRole }: Props) 
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <label className="text-sm font-semibold text-foreground">Shift Jaga</label>
-                    <input
-                      type="text"
-                      value={shiftName}
-                      className="w-full p-2 border rounded-md bg-muted text-muted-foreground font-semibold cursor-not-allowed"
-                      disabled
-                    />
+                    <div className="flex flex-wrap gap-4 mt-2">
+                      <label className="flex items-center gap-2 cursor-pointer text-sm">
+                        <input
+                          type="radio"
+                          name="shift"
+                          value="Pagi"
+                          checked={data.shift === "Pagi"}
+                          onChange={(e) => setData("shift", e.target.value)}
+                          className="w-4 h-4 text-primary"
+                        />
+                        Pagi
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer text-sm">
+                        <input
+                          type="radio"
+                          name="shift"
+                          value="Malam"
+                          checked={data.shift === "Malam"}
+                          onChange={(e) => setData("shift", e.target.value)}
+                          className="w-4 h-4 text-primary"
+                        />
+                        Malam
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer text-sm">
+                        <input
+                          type="radio"
+                          name="shift"
+                          value="Non-Shift"
+                          checked={data.shift === "Non-Shift"}
+                          onChange={(e) => setData("shift", e.target.value)}
+                          className="w-4 h-4 text-primary"
+                        />
+                        Non-Shift
+                      </label>
+                    </div>
+                    {errors.shift && <span className="text-xs text-destructive">{errors.shift}</span>}
                   </div>
                 </div>
               </div>
@@ -324,17 +336,13 @@ export default function InputPelanggaran({ anggota, jadwals, userRole }: Props) 
               </div>
 
               {/* Submit Button */}
-              {shiftName === 'Libur' && (
-                <div className="mt-4 p-3 bg-red-100 text-red-700 text-sm font-semibold rounded-md border border-red-200">
-                  Tidak dapat menginput penilaian karena Anggota/Danru sedang Libur pada tanggal tersebut.
-                </div>
-              )}
+
 
               <div className="flex justify-end gap-2 mt-4">
                 <Button
                   type="submit"
-                  disabled={processing || shiftName === 'Libur'}
-                  className={`w-full md:w-auto px-6 ${shiftName === 'Libur' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  disabled={processing}
+                  className="w-full md:w-auto px-6"
                 >
                   {processing ? "Menyimpan..." : "Simpan Pelanggaran"}
                 </Button>

@@ -27,9 +27,9 @@ class LoginController extends Controller
             // Redirect based on role
             $user = Auth::user();
             if ($user->role === 'Admin') {
-                return redirect()->intended('/admin/users');
+                return redirect()->intended('/admin/users')->with('success', 'Login berhasil! Selamat datang Admin.');
             }
-            return redirect()->intended('/');
+            return redirect()->intended('/')->with('success', 'Login berhasil! Selamat datang ' . $user->nama_lengkap);
         }
 
         return back()->withErrors([
@@ -44,6 +44,6 @@ class LoginController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect('/login');
+        return redirect('/login')->with('success', 'Anda telah berhasil logout.');
     }
 }

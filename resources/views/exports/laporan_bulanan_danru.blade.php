@@ -41,9 +41,7 @@
         <table style="width: 100%; border: none; margin-bottom: 6px;">
             <tr>
                 <td style="width: 15%; text-align: left; vertical-align: middle;">
-                    @if($logoBase64)
-                        <img src="{{ $logoBase64 }}" style="height: 75px; width: auto;">
-                    @endif
+                    <img src="{{ $logoBase64 }}" style="height: 75px; width: auto;">
                 </td>
                 <td style="width: 62%; text-align: center; vertical-align: middle;">
                     <h1 class="header-title">FORM PENILAIAN KPI KOMANDAN REGU (DANRU) BULANAN</h1>
@@ -212,16 +210,16 @@
                     <table class="data-table" style="margin-top: 0; margin-bottom: 6px;">
                         <thead>
                             <tr style="height: 24px;">
-                                <th style="width: 25%;">SKOR</th>
+                                <th style="width: 45%;">SKOR / PERSENTASE</th>
                                 <th>KETERANGAN</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr style="height: 24px;"><td class="font-bold">5</td><td class="text-left">Sangat baik</td></tr>
-                            <tr style="height: 24px;"><td class="font-bold">4</td><td class="text-left">Baik</td></tr>
-                            <tr style="height: 24px;"><td class="font-bold">3</td><td class="text-left">Cukup baik</td></tr>
-                            <tr style="height: 24px;"><td class="font-bold">2</td><td class="text-left">Kurang baik</td></tr>
-                            <tr style="height: 24px;"><td class="font-bold">1</td><td class="text-left">Buruk</td></tr>
+                            <tr style="height: 24px;"><td class="font-bold">5 (100%)</td><td class="text-left">Sangat baik</td></tr>
+                            <tr style="height: 24px;"><td class="font-bold">4 (80%)</td><td class="text-left">Baik</td></tr>
+                            <tr style="height: 24px;"><td class="font-bold">3 (60%)</td><td class="text-left">Cukup baik</td></tr>
+                            <tr style="height: 24px;"><td class="font-bold">2 (40%)</td><td class="text-left">Kurang baik</td></tr>
+                            <tr style="height: 24px;"><td class="font-bold">1 (20%)</td><td class="text-left">Buruk</td></tr>
                         </tbody>
                     </table>
 

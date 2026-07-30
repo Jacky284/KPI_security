@@ -42,7 +42,7 @@ class PelanggaranController extends Controller
             return $reguCompare;
         })->values();
 
-        $jadwals = \App\Models\JadwalBulanan::whereIn('id_anggota', $anggota->pluck('id_user'))->get();
+        $jadwals = collect();
 
         return Inertia::render('Pelanggaran/InputPelanggaran', [
             'anggota' => $anggota,
@@ -61,6 +61,7 @@ class PelanggaranController extends Controller
         $validated = $request->validate([
             'id_anggota' => 'required|exists:users,id_user',
             'tanggal_penilaian' => 'required|date',
+            'shift' => 'required|in:Pagi,Malam,Non-Shift',
             'minggu_ke' => 'required|integer|min:1|max:6',
             'bulan' => 'required|string|max:20',
             'tahun' => 'required|integer|min:2020|max:2100',
@@ -97,6 +98,7 @@ class PelanggaranController extends Controller
             'id_anggota' => $validated['id_anggota'],
             'id_penilai' => $user->id_user,
             'tanggal_penilaian' => $validated['tanggal_penilaian'],
+            'shift' => $validated['shift'],
             'minggu_ke' => $validated['minggu_ke'],
             'bulan' => $validated['bulan'],
             'tahun' => $validated['tahun'],
@@ -144,7 +146,9 @@ class PelanggaranController extends Controller
             }
         }
 
-        $pelanggaran = $query->orderBy('tanggal_penilaian', 'desc')->get();
+        $pelanggaran = $query->orderBy('tanggal_penilaian', 'desc')
+                             ->orderBy('created_at', 'desc')
+                             ->get();
 
         $reguList = \App\Models\Regu::orderBy('nama_regu', 'asc')->pluck('nama_regu')->values();
 
@@ -230,10 +234,10 @@ class PelanggaranController extends Controller
             $totalPages = $chunks->count();
 
             $html = view('exports.daftar_penilaian', [
+                'logoBase64' => config('pdf_logo.base64'),
                 'pelanggaran' => $pelanggaran,
                 'chunks' => $chunks,
                 'totalPages' => $totalPages,
-                'logoBase64' => config('pdf_logo.base64'),
                 'tglRekap' => $tglRekap,
                 'reguName' => $reguName,
                 'bulan' => $bulan,
@@ -252,6 +256,10 @@ class PelanggaranController extends Controller
                 ->landscape()
                 ->showBackground()
                 ->margins(0, 0, 0, 0)
+                ->noSandbox()
+                ->waitUntil('domcontentloaded')
+                ->timeout(30000)
+                ->setOption('args', ['--disable-web-security', '--allow-file-access-from-files'])
                 ->pdf();
                 
             return response($pdfContent)

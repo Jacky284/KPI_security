@@ -2,6 +2,7 @@ import React from "react";
 import { useForm, Head } from "@inertiajs/react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { FlashToast } from "@/components/FlashToast";
 
 export default function Login() {
   const { data, setData, post, processing, errors, reset } = useForm({
@@ -83,6 +84,7 @@ export default function Login() {
           </div>
         </div>
       </div>
+      <FlashToast />
     </>
   );
 }
