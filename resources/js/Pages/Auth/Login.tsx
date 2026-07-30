@@ -1,10 +1,12 @@
-import React from "react";
+import React, { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { useForm, Head } from "@inertiajs/react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FlashToast } from "@/components/FlashToast";
 
 export default function Login() {
+  const [showPassword, setShowPassword] = useState(false);
   const { data, setData, post, processing, errors, reset } = useForm({
     username: "",
     password: "",
@@ -60,14 +62,23 @@ export default function Login() {
                 {/* Password */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-foreground uppercase tracking-wider">Password</label>
-                  <input
-                    type="password"
-                    value={data.password}
-                    onChange={(e) => setData("password", e.target.value)}
-                    className="w-full p-2.5 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm font-semibold"
-                    placeholder="Masukkan password..."
-                    required
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={data.password}
+                      onChange={(e) => setData("password", e.target.value)}
+                      className="w-full p-2.5 pr-10 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm font-semibold"
+                      placeholder="Masukkan password..."
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                    </button>
+                  </div>
                   {errors.password && <span className="text-xs text-destructive">{errors.password}</span>}
                 </div>
 

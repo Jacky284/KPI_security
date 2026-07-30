@@ -3,7 +3,7 @@ import { useForm, Head, router } from "@inertiajs/react";
 import DashboardLayout from "@/Layouts/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Edit, Ban, CheckCircle } from "lucide-react";
+import { Edit, Ban, CheckCircle, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmModal } from "@/components/ConfirmModal";
 
@@ -63,6 +63,9 @@ export default function UserManagement({ users, regus = [] }: Props) {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleteName, setDeleteName] = useState<string>("");
   const [toggleId, setToggleId] = useState<number | null>(null);
+
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -276,12 +279,21 @@ export default function UserManagement({ users, regus = [] }: Props) {
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-foreground uppercase tracking-wider">Password (Kosongkan jika tidak diubah)</label>
-                  <input
-                    type="password"
-                    value={editData.password}
-                    onChange={(e) => setEditData("password", e.target.value)}
-                    className="w-full p-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm font-semibold"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showEditPassword ? "text" : "password"}
+                      value={editData.password}
+                      onChange={(e) => setEditData("password", e.target.value)}
+                      className="w-full p-2 pr-10 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm font-semibold"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowEditPassword(!showEditPassword)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showEditPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                    </button>
+                  </div>
                   {editErrors.password && <span className="text-xs text-destructive">{editErrors.password}</span>}
                 </div>
 
@@ -461,14 +473,23 @@ export default function UserManagement({ users, regus = [] }: Props) {
                   {/* Password */}
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-bold text-foreground uppercase tracking-wider">Password</label>
-                    <input
-                      type="password"
-                      value={data.password}
-                      onChange={(e) => setData("password", e.target.value)}
-                      className="w-full p-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm font-semibold"
-                      placeholder="Minimal 6 karakter..."
-                      required
-                    />
+                    <div className="relative">
+                      <input
+                        type={showCreatePassword ? "text" : "password"}
+                        value={data.password}
+                        onChange={(e) => setData("password", e.target.value)}
+                        className="w-full p-2 pr-10 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm font-semibold"
+                        placeholder="Minimal 6 karakter..."
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCreatePassword(!showCreatePassword)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showCreatePassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                      </button>
+                    </div>
                     {errors.password && <span className="text-xs text-destructive">{errors.password}</span>}
                   </div>
 
