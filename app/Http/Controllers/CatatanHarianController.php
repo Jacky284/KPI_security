@@ -213,7 +213,9 @@ class CatatanHarianController extends Controller
         }
         $totalPages = $chunks->count();
         
-        $html = view('exports.catatan_harian', [
+        $fileName = 'Catatan_Harian_' . ($user->role === 'Danru' ? $user->regu . '_' : '') . $bulan . '_' . $tahun . '_Mg' . $minggu_ke . '.pdf';
+        
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.catatan_harian', [
             'logoBase64' => config('pdf_logo.base64'),
             'catatan' => $catatan,
             'chunks' => $chunks,
@@ -226,23 +228,8 @@ class CatatanHarianController extends Controller
             'userName' => $user->nama_lengkap,
             'userTtdUrl' => $user->ttd_url,
             'regu' => $user->role === 'Danru' ? $user->regu : $filter_regu
-        ])->render();
+        ])->setPaper('a4', 'landscape');
         
-        $fileName = 'Catatan_Harian_' . ($user->role === 'Danru' ? $user->regu . '_' : '') . $bulan . '_' . $tahun . '_Mg' . $minggu_ke . '.pdf';
-        
-        $pdfContent = \Spatie\Browsershot\Browsershot::html($html)
-            ->format('A4')
-            ->landscape()
-            ->showBackground()
-            ->margins(0, 0, 0, 0)
-            ->noSandbox()
-            ->waitUntil('domcontentloaded')
-            ->timeout(30000)
-            ->setOption('args', ['--disable-web-security', '--allow-file-access-from-files'])
-            ->pdf();
-            
-        return response($pdfContent)
-            ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', 'inline; filename="' . $fileName . '"');
+        return $pdf->stream($fileName);
     }
 }

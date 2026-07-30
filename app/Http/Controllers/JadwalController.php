@@ -96,24 +96,12 @@ class JadwalController extends Controller
             return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\JadwalBulananExport($bulan, $tahun), "jadwal_bulanan_{$bulan}_{$tahun}.xlsx");
         } else if ($type === 'pdf') {
             $export = new \App\Exports\JadwalBulananExport($bulan, $tahun);
-            $html = view('exports.jadwal_bulanan', $export->view()->getData())->render();
-            
             $fileName = "jadwal_bulanan_{$bulan}_{$tahun}.pdf";
             
-            $pdfContent = \Spatie\Browsershot\Browsershot::html($html)
-                ->format('A4')
-                ->landscape()
-                ->showBackground()
-                ->margins(0, 0, 0, 0)
-                ->noSandbox()
-                ->waitUntil('domcontentloaded')
-                ->timeout(30000)
-                ->setOption('args', ['--disable-web-security', '--allow-file-access-from-files'])
-                ->pdf();
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.jadwal_bulanan', $export->view()->getData())
+                ->setPaper('a4', 'landscape');
                 
-            return response($pdfContent)
-                ->header('Content-Type', 'application/pdf')
-                ->header('Content-Disposition', 'inline; filename="' . $fileName . '"');
+            return $pdf->stream($fileName);
         }
 
         return redirect()->back()->with('error', 'Tipe export tidak valid');

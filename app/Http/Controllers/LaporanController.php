@@ -738,7 +738,9 @@ class LaporanController extends Controller
             }
             $totalPages = count($chunks);
 
-            $html = view('exports.laporan', [
+            $fileName = "laporan_mingguan_{$minggu_ke}_{$bulan}_{$tahun}.pdf";
+            
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.laporan', [
                 'performanceData' => $performanceData,
                 'laporanMingguan' => $laporanMingguan,
                 'bulan' => $bulan,
@@ -751,24 +753,9 @@ class LaporanController extends Controller
                 'chunks' => $chunks,
                 'totalPages' => $totalPages,
                 'logoBase64' => config('pdf_logo.base64'),
-            ])->render();
+            ])->setPaper('a4', 'landscape');
             
-            $fileName = "laporan_mingguan_{$minggu_ke}_{$bulan}_{$tahun}.pdf";
-            
-            $pdfContent = \Spatie\Browsershot\Browsershot::html($html)
-                ->format('A4')
-                ->landscape()
-                ->showBackground()
-                ->margins(0, 0, 0, 0)
-                ->noSandbox()
-                ->waitUntil('domcontentloaded')
-                ->timeout(30000)
-                ->setOption('args', ['--disable-web-security', '--allow-file-access-from-files'])
-                ->pdf();
-                
-            return response($pdfContent)
-                ->header('Content-Type', 'application/pdf')
-                ->header('Content-Disposition', 'inline; filename="' . $fileName . '"');
+            return $pdf->stream($fileName);
         }
 
         return redirect()->back()->with('error', 'Tipe export tidak valid');
@@ -911,7 +898,9 @@ class LaporanController extends Controller
             }
 
             $viewName = $jenis === 'danru' ? 'exports.laporan_bulanan_danru' : 'exports.laporan_bulanan';
-            $html = view($viewName, [
+            $fileName = "laporan_bulanan_{$jenis}_{$bulan}_{$tahun}.pdf";
+            
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($viewName, [
                 'logoBase64' => config('pdf_logo.base64'),
                 'detailedMonthlyData' => $detailedMonthlyData,
                 'laporanBulananObj' => $laporanBulanan,
@@ -925,24 +914,9 @@ class LaporanController extends Controller
                 'grandTotalScore' => $grandTotalScore,
                 'validPersonCount' => $validPersonCount,
                 'rowsPerPage' => $rowsPerPage,
-            ])->render();
+            ])->setPaper('a4', 'landscape');
             
-            $fileName = "laporan_bulanan_{$jenis}_{$bulan}_{$tahun}.pdf";
-            
-            $pdfContent = \Spatie\Browsershot\Browsershot::html($html)
-                ->format('A4')
-                ->landscape()
-                ->showBackground()
-                ->margins(0, 0, 0, 0)
-                ->noSandbox()
-                ->waitUntil('domcontentloaded')
-                ->timeout(30000)
-                ->setOption('args', ['--disable-web-security', '--allow-file-access-from-files'])
-                ->pdf();
-                
-            return response($pdfContent)
-                ->header('Content-Type', 'application/pdf')
-                ->header('Content-Disposition', 'inline; filename="' . $fileName . '"');
+            return $pdf->stream($fileName);
         }
 
         return redirect()->back()->with('error', 'Tipe export tidak valid');
