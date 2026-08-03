@@ -1,0 +1,1 @@
+import{n as e,t}from"./jsx-runtime-B-hcVAMW.js";e();var n=t();function r(){return(0,n.jsxs)(`div`,{style:{padding:`2rem`,fontFamily:`sans-serif`},children:[(0,n.jsx)(`h1`,{children:`Dashboard`}),(0,n.jsx)(`p`,{children:`Welcome to your Laravel + Inertia + React + Vite application!`})]})}export{r as default};
