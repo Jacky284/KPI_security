@@ -230,19 +230,13 @@ class CatatanHarianController extends Controller
         
         $fileName = 'Catatan_Harian_' . ($user->role === 'Danru' ? $user->regu . '_' : '') . $bulan . '_' . $tahun . '_Mg' . $minggu_ke . '.pdf';
         
-        $pdfContent = \Spatie\Browsershot\Browsershot::html($html)
-            ->format('A4')
-            ->landscape()
-            ->showBackground()
-            ->margins(0, 0, 0, 0)
-            ->noSandbox()
-            ->waitUntil('domcontentloaded')
-            ->timeout(30000)
-            ->setOption('args', ['--disable-web-security', '--allow-file-access-from-files'])
-            ->pdf();
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html)
+            ->setPaper('a4', 'landscape');
             
-        return response($pdfContent)
-            ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', 'inline; filename="' . $fileName . '"');
+        if (request()->header('X-Bypass-IDM')) {
+            return response($pdf->output(), 200, ['Content-Type' => 'text/plain']);
+        }
+            
+        return $pdf->stream($fileName, ['Attachment' => false]);
     }
 }

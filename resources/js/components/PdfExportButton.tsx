@@ -16,7 +16,7 @@ export function PdfExportButton({ url, disabled }: Props) {
     
     setIsExporting(true);
     
-    // Buka tab baru langsung agar tidak di-block oleh browser (popup blocker)
+    // Buka tab baru dengan loading state
     const newTab = window.open('', '_blank');
     if (newTab) {
       newTab.document.write(`
@@ -25,39 +25,50 @@ export function PdfExportButton({ url, disabled }: Props) {
         <head>
           <title>Mempersiapkan PDF...</title>
           <style>
-            body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+            body, html { margin: 0; padding: 0; height: 100vh; overflow: hidden; background-color: #f8fafc; font-family: -apple-system, sans-serif; }
+            .loader-container { display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw; position: absolute; top: 0; left: 0; z-index: 10; background: #f8fafc; transition: opacity 0.3s; }
             .card { background: white; padding: 2rem; border-radius: 1rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; text-align: center; max-width: 320px; width: 100%; margin: 1rem; }
             h3 { margin: 0 0 0.5rem 0; font-size: 1.125rem; color: #0f172a; }
             p { margin: 0; font-size: 0.875rem; color: #64748b; }
             .track { width: 100%; background-color: #f1f5f9; border-radius: 9999px; height: 0.5rem; margin-top: 1.5rem; overflow: hidden; position: relative; }
             .bar { background-color: #dc2626; height: 100%; border-radius: 9999px; position: absolute; top: 0; width: 40%; animation: slideRight 1s infinite alternate ease-in-out; }
             @keyframes slideRight { 0% { left: 0%; } 100% { left: 60%; } }
+            #pdf-frame { width: 100vw; height: 100vh; border: none; position: absolute; top: 0; left: 0; z-index: 1; display: none; }
           </style>
         </head>
         <body>
-          <div class="card">
-            <h3>PDF Sedang Disusun</h3>
-            <p>Mohon tunggu sebentar...</p>
-            <div class="track">
-              <div class="bar"></div>
+          <div class="loader-container" id="loader">
+            <div class="card">
+              <h3>PDF Sedang Disusun</h3>
+              <p>Mohon tunggu sebentar...</p>
+              <div class="track"><div class="bar"></div></div>
             </div>
           </div>
+          <iframe id="pdf-frame"></iframe>
         </body>
         </html>
       `);
     }
 
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: {
+          'X-Bypass-IDM': '1'
+        }
+      });
       if (!response.ok) throw new Error('Gagal mengekspor PDF');
       
       const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
+      const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+      const blobUrl = window.URL.createObjectURL(pdfBlob);
       
       if (newTab) {
-        newTab.location.href = blobUrl;
+        // Render PDF di dalam iframe dan sembunyikan loading screen
+        newTab.document.getElementById('pdf-frame').src = blobUrl;
+        newTab.document.getElementById('pdf-frame').style.display = 'block';
+        newTab.document.getElementById('loader').style.display = 'none';
+        newTab.document.title = "Preview PDF";
       } else {
-        // Fallback jika popup blocker aktif
         window.location.href = blobUrl;
       }
     } catch (error) {
