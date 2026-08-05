@@ -1,1 +1,0 @@
-import{a as e,n as t}from"./jsx-runtime-B-hcVAMW.js";import{C as n,o as r}from"./app-BFa-8dMK.js";var i=e(t(),1);function a(){let{flash:e}=n().props;return(0,i.useEffect)(()=>{e?.success&&r.success(e.success),e?.error&&r.error(e.error)},[e]),null}export{a as t};

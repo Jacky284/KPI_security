@@ -42,7 +42,7 @@
             <table style="width: 100%; border: none; margin-bottom: 6px;">
                 <tr>
                     <td style="width: 15%; text-align: left; vertical-align: middle;">
-                            <img src="{{ public_path('images/logo-app.png') }}" style="height: 75px; width: auto;">
+                            <img src="{{ public_path('images/logo-low.png') }}" style="height: 75px; width: auto;">
                     </td>
                     <td style="width: 62%; text-align: center; vertical-align: middle;">
                         <h1 class="header-title">FORM MONITORING KPI PERSONEL SECURITY (MINGGUAN)</h1>

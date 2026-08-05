@@ -105,7 +105,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenuButton size="lg" asChild className="h-12 px-2">
               <Link prefetch={false} href="/" className="flex items-center gap-2.5">
                 <div className="flex items-center justify-center shrink-0 w-9 h-9">
-                  <img src="/images/logo-app.png" alt="Logo" className="w-full h-full object-contain" />
+                  <img src="/images/logo-low.png" alt="Logo" className="w-full h-full object-contain" />
                 </div>
                 <span className="font-bold text-base tracking-tight">KPI Security</span>
               </Link>
